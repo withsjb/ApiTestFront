@@ -1,13 +1,20 @@
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  font-family: Arial, sans-serif;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+.App {
+  display: flex; /* Flexbox로 레이아웃 설정 */
+  height: 100vh; /* 전체 화면 높이 */
+}
+
+.sidebar {
+  width: 200px; /* 사이드바 너비 */
+  background-color: #f8f9fa; /* 배경색 */
+  padding: 20px;
+}
+
+.main-content {
+  flex: 1; /* 남은 공간 차지 */
+  padding: 20px;
 }
