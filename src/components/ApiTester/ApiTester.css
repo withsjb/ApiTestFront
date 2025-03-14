@@ -1,0 +1,23 @@
+.api-tester {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .api-tester .input-group {
+    display: flex; /* Flexbox로 한 줄 정렬 */
+    align-items: center;
+    gap: 10px; /* 항목 간격 */
+    margin-bottom: 10px;
+  }
+  
+  .api-tester select,
+  .api-tester input,
+  .api-tester textarea,
+  .api-tester button {
+    padding: 8px;
+  }
+  
+  textarea {
+    width: calc(100% - 20px); /* 전체 너비에서 패딩 제외 */
+  }
+  
