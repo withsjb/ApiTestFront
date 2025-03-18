@@ -1,33 +1,31 @@
 import React from 'react';
 import './ResultTable.css';
 
-function ResultTable({ results }) {
+const ResultTable = ({ results }) => {
   return (
-    <table className="result-table">
+    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
       <thead>
-        <tr>
+        <tr style={{ borderBottom: '1px solid #ccc' }}>
           <th>Testcase ID</th>
-          <th>요약</th>
-          <th>API Endpoint</th>
           <th>HTTP Method</th>
-          <th>응답 코드</th>
-          <th>성공 여부</th>
+          <th>API Endpoint</th>
+          <th>Body</th>
+          <th>Status Code</th>
         </tr>
       </thead>
       <tbody>
-        {results.map((result, index) => (
-          <tr key={index}>
+        {results.map((result) => (
+          <tr key={result.id}>
             <td>{result.id}</td>
-            <td>{result.summary}</td>
-            <td>{result.endpoint}</td>
             <td>{result.method}</td>
+            <td>{result.url}</td>
+            <td>{result.body}</td>
             <td>{result.statusCode}</td>
-            <td>{result.success ? '성공' : '실패'}</td>
           </tr>
         ))}
       </tbody>
     </table>
   );
-}
+};
 
 export default ResultTable;
