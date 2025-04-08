@@ -1,0 +1,40 @@
+/* src/components/Header.css */
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    background: #f5f5f5;
+    border-bottom: 1px solid #ccc;
+  }
+  
+  .logo {
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 20px;
+  }
+  
+  .auth-section {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .user-text {
+    font-weight: bold;
+  }
+  
+  .btn {
+    padding: 6px 10px;
+    cursor: pointer;
+    border: none;
+    background-color: #007bff;
+    color: white;
+    border-radius: 4px;
+  }
+  
+  .btn:hover {
+    background-color: #0056b3;
+  }
+  
