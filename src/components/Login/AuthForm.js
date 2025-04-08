@@ -8,6 +8,9 @@ function AuthForm({ type }) {
   const [passwd, setPasswd] = useState('');
   const navigate = useNavigate(); 
 
+  const handleGoToRegister = () => {
+    navigate('/register'); // ⬅️ /register로 이동
+  };
   const handleSubmit = async (e) => {
     e.preventDefault();
     const API = process.env.REACT_APP_API_BASE_URL;
@@ -30,12 +33,16 @@ function AuthForm({ type }) {
   };
 
   return (
+<div>
     <form onSubmit={handleSubmit}>
       <h2>{type === 'login' ? '로그인' : '회원가입'}</h2>
       <input value={id} onChange={e => setId(e.target.value)} placeholder="아이디" />
       <input type="password" value={passwd} onChange={e => setPasswd(e.target.value)} placeholder="비밀번호" />
       <button type="submit">{type === 'login' ? '로그인' : '회원가입'}</button>
+      
     </form>
+    
+    </div>
   );
 }
 
