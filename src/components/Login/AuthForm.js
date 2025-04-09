@@ -8,9 +8,10 @@ function AuthForm({ type }) {
   const [passwd, setPasswd] = useState('');
   const navigate = useNavigate(); 
 
-  const handleGoToRegister = () => {
-    navigate('/register'); // ⬅️ /register로 이동
-  };
+  // const handleGoToRegister = () => {
+  //   navigate('/register'); // ⬅️ /register로 이동
+  // };
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
     const API = process.env.REACT_APP_API_BASE_URL;

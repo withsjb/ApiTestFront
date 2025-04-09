@@ -1,7 +1,10 @@
 import React from "react";
 
 const SampleFileDownload = () => {
-  // 샘플 CSV 데이터
+  // ✅ 로컬 스토리지에서 로그인한 사용자 ID 가져오기
+  const loggedInUserId = localStorage.getItem("userId") || "1"; // 기본값은 "1"
+
+  // ✅ 샘플 CSV 데이터 (로그인한 사용자 ID 적용)
   const csvData = [
     ["method", "url", "authType", "token", "params", "headers", "body"],
     [
@@ -9,7 +12,7 @@ const SampleFileDownload = () => {
       "https://example.com/api",
       "Bearer Token",
       "example-token",
-      '[{"key":"userId","value":"1"},{"key":"active","value":"true"}]',
+      `[{"key":"userId","value":"${loggedInUserId}"},{"key":"active","value":"true"}]`,
       '[{"key":"Content-Type","value":"application/json"},{"key":"Authorization","value":"Bearer example-token"}]',
       '{"name":"John Doe","email":"john.doe@example.com"}',
     ],
@@ -18,7 +21,7 @@ const SampleFileDownload = () => {
       "https://example.com/api",
       "Bearer Token",
       "example-token",
-      '[{"key":"userId","value":"2"}]',
+      `[{"key":"userId","value":"${loggedInUserId}"}]`,
       '[{"key":"Content-Type","value":"application/json"}]',
       "",
     ],

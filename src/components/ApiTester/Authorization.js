@@ -1,28 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const Authorization = ({ onAuthChange }) => {
   const [authType, setAuthType] = useState('No Auth'); // 기본 인증 타입
-  const [authData, setAuthData] = useState({
-    username: '', // Basic Auth 사용자 이름
-    password: '', // Basic Auth 비밀번호
-    token: '',    // Bearer Token
-    key: '',      // API Key의 Key 값
-    value: '',    // API Key의 Value 값
-  });
+  // 초기 상태를 인증 타입에 맞게 설정
+  const [authData, setAuthData] = useState({});
+
+  // ✅ 인증 타입 변경 시 데이터 초기화
+  useEffect(() => {
+    const initialData = {
+      'No Auth': {},
+      'Basic Auth': { username: '', password: '' },
+      'Bearer Token': { token: '' },
+      'API Key': { key: '', value: '' }
+    };
+    setAuthData(initialData[authType]);
+    // useCallback으로 감싸진 함수를 사용하는 것이 좋습니다
+  }, [authType]); // onAuthChange 제거
+  
+  // authData가 변경될 때만 부모에게 알림
+  useEffect(() => {
+    onAuthChange({ authType, authData });
+  }, [authType, authData, onAuthChange]);
 
   const handleAuthTypeChange = (e) => {
-    const newAuthType = e.target.value;
-    setAuthType(newAuthType); // 선택된 인증 타입 업데이트
-
-    // 인증 데이터 변경을 부모 컴포넌트에 전달
-    onAuthChange({ authType: newAuthType, authData });
+    setAuthType(e.target.value); // useEffect가 처리하므로 데이터 초기화 코드 제거
   };
 
   const handleInputChange = (field, value) => {
     const updatedAuthData = { ...authData, [field]: value };
     setAuthData(updatedAuthData);
-
-    // 변경된 데이터를 부모 컴포넌트에 전달
     onAuthChange({ authType, authData: updatedAuthData });
   };
 

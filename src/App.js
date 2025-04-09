@@ -26,7 +26,7 @@ function App() {
   
   // 대량 API 테스트 결과 처리 함수 - CSV 파일 업로드 후 받은 결과 처리
   const handleBulkResults = (bulkResults) => {
-    setResults(prev => [...prev, ...bulkResults]); // 대량 테스트 결과를 테이블에 추가
+    setResults((prevResults) => [...prevResults, ...bulkResults]); // 기존 데이터와 병합
   };
 
   return (

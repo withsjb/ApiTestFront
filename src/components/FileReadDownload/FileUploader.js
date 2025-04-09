@@ -17,24 +17,61 @@ const FileUploader = ({ onResultsReceived }) => {
       setError('파일을 선택해주세요.');
       return;
     }
-
+  
     setLoading(true);
     setError(null);
-
+  
     try {
-      // CSV 파일 파싱
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
         complete: async (results) => {
           try {
-            // 파싱된 데이터를 서버로 전송
+            // ✅ 인증 타입별 데이터 처리 개선
+            const parsedData = results.data.map((row) => {
+              // ✅ JSON 파싱 오류 안전하게 처리
+              const parseJsonField = (field, defaultValue = []) => {
+                try {
+                  return field ? JSON.parse(field) : defaultValue;
+                } catch (e) {
+                  throw new Error(`${field} 필드의 JSON 형식이 올바르지 않습니다.`);
+                }
+              };
+              
+              return {
+                method: row.method,
+                url: row.url,
+                authType: row.authType || 'No Auth', // 기본값 설정
+                // ✅ 인증 타입에 따라 필요한 데이터만 포함
+                ...(row.authType === 'Bearer Token' && { token: row.token }),
+                // ✅ 인증 데이터 구조화
+                authData: {
+                  ...(row.authType === 'Basic Auth' && { 
+                    username: row.username, 
+                    password: row.password 
+                  }),
+                  ...(row.authType === 'API Key' && { 
+                    key: row.key, 
+                    value: row.value 
+                  })
+                },
+                params: parseJsonField(row.params),
+                headers: parseJsonField(row.headers),
+                body: row.body || '',
+              };
+            });
+  
+            // ✅ API 엔드포인트 환경변수 사용
             const response = await axios.post(
-              'http://localhost:8081/api/bulk-test',
-              results.data
+              `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:8081'}/api/bulk-test`,
+              parsedData,
+              {
+                headers: {
+                  'Content-Type': 'application/json',
+                }
+              }
             );
-            
-            // 결과 처리
+  
             onResultsReceived(response.data);
             setLoading(false);
           } catch (err) {
@@ -45,14 +82,14 @@ const FileUploader = ({ onResultsReceived }) => {
         error: (err) => {
           setError('파일 파싱 중 오류가 발생했습니다: ' + err.message);
           setLoading(false);
-        }
+        },
       });
     } catch (err) {
       setError('파일 처리 중 오류가 발생했습니다: ' + err.message);
       setLoading(false);
     }
   };
-
+  
   return (
     <div style={{ marginBottom: '20px', padding: '15px', border: '1px solid #eee', borderRadius: '4px' }}>
       <h3>대량 API 테스트</h3>

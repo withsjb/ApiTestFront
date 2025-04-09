@@ -14,9 +14,9 @@ const ResultTable = ({ results }) => {
         </tr>
       </thead>
       <tbody>
-        {results.map((result) => (
-          <tr key={result.id}>
-            <td>{result.id}</td>
+        {results.map((result, index) => (
+          <tr key={index}>
+            <td>{result.testcaseId}</td>
             <td>{result.method}</td>
             <td>{result.url}</td>
             <td>{result.body}</td>
