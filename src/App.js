@@ -14,13 +14,34 @@ function App() {
   const [selectedHistory, setSelectedHistory] = useState(null);
   const [results, setResults] = useState([]); // ResultTable에 표시할 결과 저장
 
-  // 단일 API 요청 처리 함수 - 실제 API 엔드포인트로 요청 전송
-  const handleSendRequest = async (result) => {
+
+  // 반드시 내 백엔드로만 요청!
+  const handleSendRequest = async (requestData) => {
     try {
-      const response = await axios.post("http://localhost:8081/api/test", result); // 실제 API 요청 전송
-      setResults([...results, { ...result, statusCode: response.status }]); // 응답 상태 코드 추가
+      // Authorization 헤더 추가
+      const token = localStorage.getItem('token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
+      // 내 백엔드 /api/test로 요청
+      const response = await axios.post('/api/test', requestData, { headers });
+
+      // 백엔드 응답 구조에 맞게 데이터 추출
+      const responseData = response.data;
+      
+      setResults(prevResults => [
+        ...prevResults,
+        {
+          testcaseId: Date.now(),
+          method: requestData.method,
+          url: requestData.url,
+          body: requestData.body,
+          statusCode: responseData.statusCode || response.status,
+          responseBody: responseData.body
+        }
+      ]);
     } catch (error) {
       console.error("API 요청 실패:", error);
+      alert("API 요청 실패: " + (error.response?.data || error.message));
     }
   };
   

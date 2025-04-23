@@ -56,15 +56,34 @@ const ApiTester = ({ selectedHistory, onSendRequest }) => {
   const handleSubmit = (e) => {
     e.preventDefault(); // 기본 폼 제출 동작 방지
 
+    // 인증 정보 처리 개선
+    let authHeader = {};
+    if (formData.authorization && formData.authorization.authType) {
+      if (formData.authorization.authType === 'Bearer Token' && formData.authorization.authData?.token) {
+        authHeader = { key: 'Authorization', value: `Bearer ${formData.authorization.authData.token}` };
+      } else if (formData.authorization.authType === 'Basic Auth') {
+        // Basic Auth 처리
+      }
+      // 다른 인증 타입도 처리
+    }
+    
+    // 빈 key-value 쌍 제거
+    const cleanParams = formData.params.filter(p => p.key || p.value);
+    const cleanHeaders = [...formData.headers.filter(h => h.key || h.value)];
+    
+    // 인증 헤더 추가
+    if (authHeader.key) {
+      cleanHeaders.push(authHeader);
+    }
+
     const result = {
-      id: Date.now(),           // 고유 ID 생성 (현재 시간 기반)
+      userId: localStorage.getItem('userId'),  // 고유 ID 
       method: formData.method,  // HTTP 메서드
       url: formData.url,        // 요청 URL
       authorization: formData.authorization, // Authorization 헤더 값
-      params: formData.params,  // 쿼리 파라미터 배열
-      headers: formData.headers,// HTTP 헤더 배열
+      params: cleanParams,  // 쿼리 파라미터 배열
+      headers: cleanHeaders,// HTTP 헤더 배열
       body: formData.body,      // 요청 본문 (JSON)
-      statusCode: 200           // 예시로 성공 상태 코드 설정
     };
 
     onSendRequest(result); // 부모 컴포넌트로 결과 전달
@@ -91,7 +110,8 @@ const ApiTester = ({ selectedHistory, onSendRequest }) => {
           </select>
 
           <label>URL:</label>
-          <input 
+          <input
+            className="url-input" 
             type="text" 
             placeholder="Enter URL"
             value={formData.url} 

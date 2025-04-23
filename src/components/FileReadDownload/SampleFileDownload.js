@@ -1,66 +1,65 @@
 import React, { useEffect, useState } from "react";
 
 const SampleFileDownload = () => {
-  // ✅ 기본값은 "가져오지 못함"으로 설정
   const [userId, setUserId] = useState("가져오지 못함");
 
-  // ✅ localStorage에서 사용자 ID 가져오기
   useEffect(() => {
     const storedUserId = localStorage.getItem("userId");
-    if (storedUserId) {
-      setUserId(storedUserId); // localStorage에서 ID를 가져와 상태 업데이트
-    }
+    if (storedUserId) setUserId(storedUserId);
   }, []);
 
   const downloadCsvFile = () => {
-    // ✅ 샘플 CSV 데이터 (다양한 HTTP 메서드 포함)
-    const csvData = [
+    // 1. 메모리에 CSV 내용 생성 (실제 테스트 가능한 공개 API 예시)
+    const rows = [
       ["method", "url", "userId", "params", "headers", "body"],
       [
-        "POST",
-        "https://example.com/api",
+        "GET",
+        "https://jsonplaceholder.typicode.com/posts/1",
         userId,
-        '[{"key":"userId","value":"123"},{"key":"active","value":"true"}]',
-        '[{"key":"Content-Type","value":"application/json"},{"key":"Authorization","value":"Bearer example-token"}]',
-        '{"name":"John Doe","email":"john.doe@example.com"}',
+        "[]",
+        "[]",
+        ""
       ],
       [
-        "GET",
-        "https://example.com/api",
+        "POST",
+        "https://jsonplaceholder.typicode.com/posts",
         userId,
-        '[{"key":"userId","value":"123"}]',
-        '[{"key":"Content-Type","value":"application/json"}]',
-        "",
+        "[]",
+        JSON.stringify([{ "key": "Content-Type", "value": "application/json" }]),
+        JSON.stringify({ "title": "foo", "body": "bar", "userId": 1 })
       ],
       [
         "PUT",
-        "https://example.com/api/resource/123",
+        "https://jsonplaceholder.typicode.com/posts/1",
         userId,
-        "",
-        '[{"key":"Content-Type","value":"application/json"},{"key":"Authorization","value":"Bearer example-token"}]',
-        '{"name":"Jane Doe","email":"jane.doe@example.com"}',
+        "[]",
+        JSON.stringify([{ "key": "Content-Type", "value": "application/json" }]),
+        JSON.stringify({ "id": 1, "title": "baz", "body": "qux", "userId": 1 })
       ],
       [
         "DELETE",
-        "https://example.com/api/resource/123",
+        "https://jsonplaceholder.typicode.com/posts/1",
         userId,
-        "",
-        '[{"key":"Authorization","value":"Bearer example-token"}]',
-        "",
-      ],
+        "[]",
+        "[]",
+        ""
+      ]
     ];
 
-    // ✅ CSV 파일 생성 및 다운로드
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      csvData.map((row) => row.join(",")).join("\n");
-    const encodedUri = encodeURI(csvContent);
+    // 2. 각 필드를 따옴표로 감싸서 CSV 형식 유지
+    const csvContent = rows.map(row => 
+      row.map(field => 
+        typeof field === 'string' ? `"${field.replace(/"/g, '""')}"` : `"${field}"`
+      ).join(',')
+    ).join('\n');
+
+    // 3. 파일 다운로드
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "sample_api_requests.csv");
-    document.body.appendChild(link);
+    link.href = url;
+    link.download = "sample_api_requests.csv";
     link.click();
-    document.body.removeChild(link);
   };
 
   return (
