@@ -1,6 +1,76 @@
 /* Sidebar.css */
-.sidebar {
-    background-color: #f8f9fa;
-    padding: 20px;
-  }
-  
+.sidebar-container {
+  padding: 10px;
+  height: 100%;
+  overflow-y: auto;
+  border-right: 1px solid #eee;
+}
+
+.history-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.history-item, .selected-history-item {
+  padding: 10px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid #eee;
+  transition: all 0.2s ease;
+}
+
+.history-item:hover {
+  background-color: #f8f9fa;
+  border-color: #ddd;
+}
+
+.selected-history-item {
+  background-color: #e8f4ff;
+  border-color: #007bff;
+}
+
+.history-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.method-badge {
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+  margin-right: 8px;
+}
+
+.url-text {
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-details {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.status-badge {
+  font-weight: bold;
+}
+
+.timestamp {
+  color: #777;
+}
+
+.no-history-message {
+  color: #777;
+  text-align: center;
+  margin-top: 20px;
+  font-style: italic;
+}

@@ -1,17 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import Papa from 'papaparse';
-import axios from 'axios';
+import axios from '../../api/axiosInstance';
 
 const FileUploader = ({ onResultsReceived }) => {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [abortController] = useState(new AbortController()); // 1. 요청 취소 기능 추가
+  const [abortController] = useState(new AbortController());
 
-  // 2. 컴포넌트 언마운트 시 요청 취소
   useEffect(() => {
     return () => abortController.abort();
-  }, []);
+  }, [abortController]);
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
@@ -23,7 +22,6 @@ const FileUploader = ({ onResultsReceived }) => {
       setError('파일을 선택해주세요.');
       return;
     }
-
     setLoading(true);
     setError(null);
 
@@ -35,36 +33,24 @@ const FileUploader = ({ onResultsReceived }) => {
           try {
             const parsedData = results.data
               .map((row, index) => {
-                try {
-                  // 3. 필수 필드 검증 강화
-                  if (!row.method || !row.url) {
-                    throw new Error(`행 ${index+1}: method와 url은 필수 입력값입니다`);
-                  }
-
-                  // 4. JSON 파싱 유틸리티 함수 분리
-                  const parseJSONField = (fieldName, jsonStr) => {
-                    try {
-                      return jsonStr ? JSON.parse(jsonStr) : [];
-                    } catch (e) {
-                      const cleaned = jsonStr
-                        .replace(/([{,])\s*(\w+):/g, '$1"$2":')
-                        .replace(/:\s*'([^']*)'/g, ':"$1"');
-                      return JSON.parse(cleaned);
-                    }
-                  };
-
-                  return {
-                    method: row.method.toUpperCase(), // 5. 메서드 대문자 통일
-                    url: row.url,
-                    userId: row.userId || localStorage.getItem("userId"),
-                    params: parseJSONField('params', row.params),
-                    headers: parseJSONField('headers', row.headers),
-                    body: row.body ? parseJSONField('body', row.body) : ""
-                  };
-                } catch (e) {
-                  console.error(`행 ${index+1} 처리 오류:`, e);
-                  throw e; // 6. 오류 전파
+                if (!row.method || !row.url) {
+                  throw new Error(`행 ${index + 1}: method와 url은 필수 입력값입니다`);
                 }
+                const parseJSONField = (jsonStr, fallback) => {
+                  if (!jsonStr) return fallback;
+                  try { return JSON.parse(jsonStr); } catch { return fallback; }
+                };
+                return {
+                  method: row.method.toUpperCase(),
+                  url: row.url,
+                  userId: row.userId || localStorage.getItem("userId"),
+                  params: parseJSONField(row.params, []),
+                  headers: parseJSONField(row.headers, []),
+                  body: row.body ? row.body : "",
+                  authType: row.authType,
+                  authData: parseJSONField(row.authData, {}),
+                  token: row.token
+                };
               })
               .filter(Boolean);
 
@@ -72,29 +58,33 @@ const FileUploader = ({ onResultsReceived }) => {
               throw new Error("유효한 데이터가 없습니다.");
             }
 
+            // ✅ 여기서 토큰을 반드시 포함!
+            const token = localStorage.getItem('token');
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
             const response = await axios.post(
               `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:8081'}/api/bulk-test`,
               parsedData,
-              { signal: abortController.signal } // 7. 요청 취소 신호 연결
+              { headers, signal: abortController.signal }
             );
 
-            // 8. 상세 에러 리포트 생성
-            const errorResults = response.data.filter(r => r.statusCode >= 400);
+            const errorResults = response.data.details
+              ? response.data.details.filter(r => r.statusCode >= 400)
+              : [];
             if (errorResults.length > 0) {
               setError({
                 message: `${errorResults.length}건의 요청 실패`,
-                details: errorResults // 9. 상세 오류 정보 저장
+                details: errorResults
               });
             }
 
-            onResultsReceived(response.data);
+            onResultsReceived(response.data.details || response.data);
 
           } catch (err) {
-            // 10. 백엔드 에러 메시지 우선 사용
             const errorMessage = err.response?.data?.errorMessage || err.message;
-            setError({ 
+            setError({
               message: errorMessage,
-              details: err.response?.data?.errors 
+              details: err.response?.data?.errors
             });
           } finally {
             setLoading(false);
@@ -115,17 +105,17 @@ const FileUploader = ({ onResultsReceived }) => {
     <div style={{ marginBottom: '20px', padding: '15px', border: '1px solid #eee', borderRadius: '4px' }}>
       <h3>대량 API 테스트</h3>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-        <input 
-          type="file" 
-          accept=".csv" 
+        <input
+          type="file"
+          accept=".csv"
           onChange={handleFileChange}
           style={{ flex: 1 }}
           disabled={loading}
         />
-        <button 
+        <button
           onClick={handleUpload}
           disabled={loading || !file}
-          style={{ 
+          style={{
             padding: '5px 10px',
             backgroundColor: loading ? '#ccc' : '#4285f4',
             color: 'white',
@@ -138,7 +128,6 @@ const FileUploader = ({ onResultsReceived }) => {
         </button>
       </div>
 
-      {/* 11. 상세 오류 표시 UI */}
       {error && (
         <div style={{ color: 'red', marginTop: '10px' }}>
           <div>{error.message}</div>
