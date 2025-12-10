@@ -1,34 +1,40 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState } from 'react';
 
 const Authorization = ({ onAuthChange }) => {
-  const [authType, setAuthType] = useState('No Auth'); // 기본 인증 타입
-  // 초기 상태를 인증 타입에 맞게 설정
-  const [authData, setAuthData] = useState({});
-
-  // ✅ 인증 타입 변경 시 데이터 초기화
-  useEffect(() => {
-    const initialData = {
-      'No Auth': {},
-      'Basic Auth': { username: '', password: '' },
-      'Bearer Token': { token: '' },
-      'API Key': { key: '', value: '' }
-    };
-    setAuthData(initialData[authType]);
-    // useCallback으로 감싸진 함수를 사용하는 것이 좋습니다
-  }, [authType]); // onAuthChange 제거
-  
-  // authData가 변경될 때만 부모에게 알림
-  useEffect(() => {
-    onAuthChange({ authType, authData });
-  }, [authType, authData, onAuthChange]);
-
-  const handleAuthTypeChange = (e) => {
-    setAuthType(e.target.value); // useEffect가 처리하므로 데이터 초기화 코드 제거
+  // 초기 기본값 정의
+  const initialAuthType = 'No Auth';
+  const initialDataMap = {
+    'No Auth': {},
+    'Basic Auth': { username: '', password: '' },
+    'Bearer Token': { token: '' },
+    'API Key': { key: '', value: '' }
   };
 
+  const [authType, setAuthType] = useState(initialAuthType);
+  const [authData, setAuthData] = useState(initialDataMap[initialAuthType]);
+
+  // 1. Auth Type 변경 핸들러
+  const handleAuthTypeChange = (e) => {
+    const newType = e.target.value;
+    const newData = initialDataMap[newType]; // 해당 타입의 초기 데이터 가져오기
+
+    // 상태 업데이트
+    setAuthType(newType);
+    setAuthData(newData);
+
+    // ✅ useEffect를 기다리지 않고, 즉시 부모에게 알림 (무한 루프 방지)
+    onAuthChange({ authType: newType, authData: newData });
+  };
+
+  // 2. 입력 필드 변경 핸들러
   const handleInputChange = (field, value) => {
     const updatedAuthData = { ...authData, [field]: value };
+
+    // 상태 업데이트
     setAuthData(updatedAuthData);
+
+    // ✅ 여기서도 즉시 부모에게 알림
     onAuthChange({ authType, authData: updatedAuthData });
   };
 
@@ -49,13 +55,13 @@ const Authorization = ({ onAuthChange }) => {
             <input
               type="text"
               placeholder="Username"
-              value={authData.username}
+              value={authData.username || ''} // undefined 방지
               onChange={(e) => handleInputChange('username', e.target.value)}
             />
             <input
               type="password"
               placeholder="Password"
-              value={authData.password}
+              value={authData.password || ''}
               onChange={(e) => handleInputChange('password', e.target.value)}
             />
           </>
@@ -65,7 +71,7 @@ const Authorization = ({ onAuthChange }) => {
           <input
             type="text"
             placeholder="Token"
-            value={authData.token}
+            value={authData.token || ''}
             onChange={(e) => handleInputChange('token', e.target.value)}
           />
         )}
@@ -75,13 +81,13 @@ const Authorization = ({ onAuthChange }) => {
             <input
               type="text"
               placeholder="Key"
-              value={authData.key}
+              value={authData.key || ''}
               onChange={(e) => handleInputChange('key', e.target.value)}
             />
             <input
               type="text"
               placeholder="Value"
-              value={authData.value}
+              value={authData.value || ''}
               onChange={(e) => handleInputChange('value', e.target.value)}
             />
           </>

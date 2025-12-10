@@ -7,27 +7,30 @@ const Sidebar = ({ onSelectHistory }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // ✅ 수정: 컴포넌트 마운트 시와 주기적으로 히스토리 목록 새로고침
   useEffect(() => {
     fetchHistory();
-    
-    // 10초마다 히스토리 자동 새로고침 (선택사항)
-    const intervalId = setInterval(fetchHistory, 10000);
-    
-    // 컴포넌트 언마운트 시 interval 정리
+
+    // 10분마다 히스토리 자동 새로고침
+    const intervalId = setInterval(fetchHistory, 600000);
+
     return () => clearInterval(intervalId);
   }, []);
 
-  // ✅ 수정: 히스토리 데이터 가져오기 함수
   const fetchHistory = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
-      // 백엔드 API 호출
       const response = await axios.get('/api/history');
-      console.log('히스토리 데이터:', response.data);
-      setHistory(response.data);
+      const data = response.data;
+
+      // 안전하게 key를 위해 중복 방지 및 id 없는 항목 처리
+      const uniqueData = data.map((item, index) => ({
+        ...item,
+        safeKey: item.api_id ?? `temp-${index}`  // api_id 없으면 임시 key
+      }));
+
+      setHistory(uniqueData);
     } catch (err) {
       console.error('히스토리 조회 실패:', err);
       setError('히스토리를 불러올 수 없습니다. 로그인 상태를 확인해주세요.');
@@ -36,7 +39,6 @@ const Sidebar = ({ onSelectHistory }) => {
     }
   };
 
-  // ✅ 수정: 수동으로 새로고침하는 버튼 추가
   const handleRefresh = () => {
     fetchHistory();
   };
@@ -44,8 +46,7 @@ const Sidebar = ({ onSelectHistory }) => {
   return (
     <div className="sidebar-container">
       <h3>API History</h3>
-      
-      {/* 새로고침 버튼 */}
+
       <button 
         onClick={handleRefresh} 
         style={{ 
@@ -60,23 +61,15 @@ const Sidebar = ({ onSelectHistory }) => {
       >
         새로고침
       </button>
-      
-      {/* 로딩 상태 표시 */}
+
       {loading && <p>로딩 중...</p>}
-      
-      {/* 오류 메시지 */}
       {error && <p style={{ color: 'red' }}>{error}</p>}
-      
-      {/* 히스토리가 없는 경우 */}
-      {!loading && !error && history.length === 0 && (
-        <p>저장된 API 히스토리가 없습니다.</p>
-      )}
-      
-      {/* 히스토리 목록 */}
+      {!loading && !error && history.length === 0 && <p>저장된 API 히스토리가 없습니다.</p>}
+
       <ul className="history-list">
         {history.map(item => (
           <li 
-            key={item.api_id} 
+            key={item.safeKey}  // 안전한 key 사용
             onClick={() => onSelectHistory(item)}
             style={{ cursor: 'pointer', padding: '10px', borderBottom: '1px solid #ccc' }}
           >
