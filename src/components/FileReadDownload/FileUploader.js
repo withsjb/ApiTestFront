@@ -1,16 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import Papa from 'papaparse';
-import axios from '../../api/axiosInstance';
+import React, { useState } from 'react';
+import axios from '../../api/axiosInstance'; // 경로가 맞는지 확인해주세요
 
 const FileUploader = ({ onResultsReceived }) => {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [abortController] = useState(new AbortController());
-
-  useEffect(() => {
-    return () => abortController.abort();
-  }, [abortController]);
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
@@ -18,85 +12,65 @@ const FileUploader = ({ onResultsReceived }) => {
   };
 
   const handleUpload = async () => {
+    // 1. 파일 선택 여부 확인
     if (!file) {
       setError('파일을 선택해주세요.');
       return;
     }
+
     setLoading(true);
     setError(null);
 
     try {
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        complete: async (results) => {
-          try {
-            const parsedData = results.data
-              .map((row, index) => {
-                if (!row.method || !row.url) {
-                  throw new Error(`행 ${index + 1}: method와 url은 필수 입력값입니다`);
-                }
-                const parseJSONField = (jsonStr, fallback) => {
-                  if (!jsonStr) return fallback;
-                  try { return JSON.parse(jsonStr); } catch { return fallback; }
-                };
-                return {
-                  method: row.method.toUpperCase(),
-                  url: row.url,
-                  userId: row.userId || localStorage.getItem("userId"),
-                  params: parseJSONField(row.params, []),
-                  headers: parseJSONField(row.headers, []),
-                  body: row.body ? row.body : "",
-                  authType: row.authType,
-                  authData: parseJSONField(row.authData, {}),
-                  token: row.token
-                };
-              })
-              .filter(Boolean);
+      const formData = new FormData();
+      formData.append('file', file);
 
-            if (parsedData.length === 0) {
-              throw new Error("유효한 데이터가 없습니다.");
-            }
+      // ---------------------------------------------------------
+      // [수정된 부분] userId를 localStorage에서 가져와서 추가
+      // ---------------------------------------------------------
+      // 로그인 시 저장한 키 값(예: 'userId', 'id' 등)과 일치해야 합니다.
+      // const userId = localStorage.getItem('userId'); 
+      
+      // if (userId) {
+      //   formData.append('userId', userId);
+      // } else {
+      //   // userId가 없으면 백엔드에서 에러가 나므로 미리 차단
+      //   throw new Error('로그인 사용자 정보(userId)를 찾을 수 없습니다. 다시 로그인해주세요.');
+      // }
+      // ---------------------------------------------------------
 
-            // ✅ 여기서 토큰을 반드시 포함!
-            const token = localStorage.getItem('token');
-            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      // Authorization 토큰 헤더 설정
+      const token = localStorage.getItem('token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
+      // Content-Type은 FormData 전송 시 브라우저가 자동으로 'multipart/form-data'로 설정하므로
+      // 별도로 지정하지 않아도 됩니다 (axios가 처리).
 
-            const response = await axios.post(
-              `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:8081'}/api/bulk-test`,
-              parsedData,
-              { headers, signal: abortController.signal }
-            );
+      const base = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8081';
+      
+      // 요청 전송
+      const res = await axios.post(`${base}/api/bulk-test`, formData, { headers });
 
-            const errorResults = response.data.details
-              ? response.data.details.filter(r => r.statusCode >= 400)
-              : [];
-            if (errorResults.length > 0) {
-              setError({
-                message: `${errorResults.length}건의 요청 실패`,
-                details: errorResults
-              });
-            }
+      // 결과 처리
+      const details = res.data.details || res.data.results || res.data;
+      if (onResultsReceived) {
+        onResultsReceived(details);
+      }
 
-            onResultsReceived(response.data.details || response.data);
-
-          } catch (err) {
-            const errorMessage = err.response?.data?.errorMessage || err.message;
-            setError({
-              message: errorMessage,
-              details: err.response?.data?.errors
-            });
-          } finally {
-            setLoading(false);
-          }
-        },
-        error: (err) => {
-          setError({ message: `CSV 파싱 오류: ${err.message}` });
-          setLoading(false);
-        }
-      });
     } catch (err) {
-      setError({ message: `파일 처리 오류: ${err.message}` });
+      // 에러 처리 로직
+      const serverMsg = err.response?.data?.message || err.response?.data?.errorMessage;
+      
+      // 직접 throw new Error() 한 경우와 Axios 에러 구분
+      const errorMessage = serverMsg || err.message || '업로드 중 오류가 발생했습니다.';
+
+      setError({
+        message: errorMessage,
+        details: err.response?.data ?? null
+      });
+      
+      console.error('bulk upload error:', err);
+    } finally {
       setLoading(false);
     }
   };
@@ -104,6 +78,7 @@ const FileUploader = ({ onResultsReceived }) => {
   return (
     <div style={{ marginBottom: '20px', padding: '15px', border: '1px solid #eee', borderRadius: '4px' }}>
       <h3>대량 API 테스트</h3>
+
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
         <input
           type="file"
@@ -130,11 +105,11 @@ const FileUploader = ({ onResultsReceived }) => {
 
       {error && (
         <div style={{ color: 'red', marginTop: '10px' }}>
-          <div>{error.message}</div>
+          <div>{error.message || error}</div>
           {error.details && (
             <details style={{ marginTop: '5px' }}>
               <summary>상세 정보 보기</summary>
-              <pre>{JSON.stringify(error.details, null, 2)}</pre>
+              <pre style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(error.details, null, 2)}</pre>
             </details>
           )}
         </div>

@@ -9,32 +9,41 @@ const SampleFileDownload = () => {
   }, []);
 
   const downloadCsvFile = () => {
-    // 1. 메모리에 CSV 내용 생성 (실제 테스트 가능한 공개 API 예시)
+    // CSV 헤더에 authType, token, authData 추가
     const rows = [
-      ["method", "url", "userId", "params", "headers", "body"],
+      ["method", "url", "userId", "params", "headers", "body", "authType", "token", "authData"],
       [
         "GET",
         "https://jsonplaceholder.typicode.com/posts/1",
         userId,
         "[]",
         "[]",
-        ""
+        "",
+        "None",     // 기본: No Auth
+        "",
+        "{}"
       ],
       [
         "POST",
         "https://jsonplaceholder.typicode.com/posts",
         userId,
         "[]",
-        JSON.stringify([{ "key": "Content-Type", "value": "application/json" }]),
-        JSON.stringify({ "title": "foo", "body": "bar", "userId": 1 })
+        JSON.stringify([{ key: "Content-Type", value: "application/json" }]),
+        JSON.stringify({ title: "foo", body: "bar", userId: 1 }),
+        "None",
+        "",
+        "{}"
       ],
       [
         "PUT",
         "https://jsonplaceholder.typicode.com/posts/1",
         userId,
         "[]",
-        JSON.stringify([{ "key": "Content-Type", "value": "application/json" }]),
-        JSON.stringify({ "id": 1, "title": "baz", "body": "qux", "userId": 1 })
+        JSON.stringify([{ key: "Content-Type", value: "application/json" }]),
+        JSON.stringify({ id: 1, title: "baz", body: "qux", userId: 1 }),
+        "None",
+        "",
+        "{}"
       ],
       [
         "DELETE",
@@ -42,18 +51,27 @@ const SampleFileDownload = () => {
         userId,
         "[]",
         "[]",
-        ""
+        "",
+        "None",
+        "",
+        "{}"
       ]
     ];
 
-    // 2. 각 필드를 따옴표로 감싸서 CSV 형식 유지
-    const csvContent = rows.map(row => 
-      row.map(field => 
-        typeof field === 'string' ? `"${field.replace(/"/g, '""')}"` : `"${field}"`
-      ).join(',')
-    ).join('\n');
+    // CSV 변환
+    const csvContent = rows
+      .map(row =>
+        row
+          .map(field =>
+            typeof field === "string"
+              ? `"${field.replace(/"/g, '""')}"`
+              : `"${field}"`
+          )
+          .join(",")
+      )
+      .join("\n");
 
-    // 3. 파일 다운로드
+    // 파일 다운로드 처리
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
