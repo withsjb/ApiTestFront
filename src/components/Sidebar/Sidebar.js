@@ -5,17 +5,22 @@ import './Sidebar.css';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faPenToSquare, faTrashCan, faArrowRotateRight, 
-  faFolder, faFolderOpen, faChevronRight, faChevronDown, faPlus, faShareFromSquare
+  faFolder, faFolderOpen, faChevronRight, faChevronDown, faPlus, faShareFromSquare,
+  faPlay 
 } from '@fortawesome/free-solid-svg-icons';
 
-const Sidebar = ({ onSelectHistory, onRefresh, refreshTrigger }) => {
+const Sidebar = ({ onSelectHistory, onRefresh, refreshTrigger, onBulkResults }) => {
   const [history, setHistory] = useState([]);
   const [collections, setCollections] = useState([]);
   const [loading, setLoading] = useState(false);
   const [openCollections, setOpenCollections] = useState({});
   
+  // ✅ 모달 관련 상태 통합
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newFolderName, setNewFolderName] = useState("");
+  const [modalMode, setModalMode] = useState("create"); // "create" 또는 "edit"
+  const [folderNameInput, setFolderNameInput] = useState("");
+  const [editingCollectionId, setEditingCollectionId] = useState(null);
+
   const [movingItemId, setMovingItemId] = useState(null); 
   const userId = 1; 
 
@@ -46,38 +51,82 @@ const Sidebar = ({ onSelectHistory, onRefresh, refreshTrigger }) => {
     }
   };
 
-  // ✅ 폴더 생성
-  const handleCreateCollection = async () => {
-    if (!newFolderName.trim()) return;
+  // ✅ 모달 열기 함수 (모드에 따라 초기값 설정)
+  const openModal = (mode, collection = null) => {
+    setModalMode(mode);
+    if (mode === "edit" && collection) {
+      setEditingCollectionId(collection.collectionId);
+      setFolderNameInput(collection.name);
+    } else {
+      setEditingCollectionId(null);
+      setFolderNameInput("");
+    }
+    setIsModalOpen(true);
+  };
+
+  // ✅ 폴더 저장 (생성/수정 통합)
+  const handleSaveCollection = async () => {
+    if (!folderNameInput.trim()) return;
+    
     try {
-        await axios.post('/api/collections', {
-            name: newFolderName,
-            userId: userId,
-            sortOrder: collections.length 
-        });
-        setNewFolderName("");
+        if (modalMode === "create") {
+            // 생성 로직
+            await axios.post('/api/collections', {
+                name: folderNameInput,
+                userId: userId,
+                sortOrder: collections.length 
+            });
+        } else {
+            // 수정 로직 (PATCH)
+            await axios.patch(`/api/collections/${editingCollectionId}`, {
+                name: folderNameInput
+            });
+        }
+        
+        setFolderNameInput("");
         setIsModalOpen(false);
         fetchAllData(); 
     } catch (err) {
-        alert("폴더 생성에 실패했습니다.");
+        alert(`폴더 ${modalMode === "create" ? "생성" : "수정"}에 실패했습니다.`);
     }
   };
 
-  // ✅ 폴더 삭제 기능 추가
   const handleDeleteCollection = async (e, collectionId) => {
-    e.stopPropagation(); // 폴더 토글 방지
+    e.stopPropagation(); 
     if (!window.confirm("이 폴더를 삭제하시겠습니까? (폴더 안의 기록은 유지됩니다.)")) return;
     
     try {
       await axios.delete(`/api/collections/${collectionId}`);
-      fetchAllData(); // 삭제 후 목록 새로고침
+      fetchAllData(); 
     } catch (err) {
       console.error("폴더 삭제 실패:", err);
       alert("폴더 삭제에 실패했습니다.");
     }
   };
 
-  // ✅ 폴더 이동 처리
+  const handleRunCollectionTest = async (e, collectionId) => {
+    e.stopPropagation(); 
+    if (!window.confirm("이 폴더 안의 모든 API를 실행하시겠습니까?")) return;
+    
+    setLoading(true);
+    try {
+      const res = await axios.post(`/api/bulk-test/collection/${collectionId}`);
+      const { successCount, failCount, details } = res.data;
+      alert(`단체 테스트 완료!\n성공: ${successCount}건\n실패: ${failCount}건`);
+      if (onBulkResults && details) {
+        onBulkResults(details); 
+      }
+      console.log("결과 데이터:", details)
+      fetchAllData(); 
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      console.error("단체 테스트 실패:", err);
+      alert("테스트 중 서버 오류가 발생했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleMoveItem = async (item, targetCollectionId) => {
     try {
       const refinedItem = {
@@ -95,8 +144,7 @@ const Sidebar = ({ onSelectHistory, onRefresh, refreshTrigger }) => {
       if (onRefresh) onRefresh();
     } catch (err) {
       console.error("이동 실패 상세:", err);
-      const errorMsg = err.response?.data?.message || "데이터 형식이 올바르지 않습니다.";
-      alert(`폴더 이동 실패: ${errorMsg}`);
+      alert("폴더 이동 실패");
     }
   };
 
@@ -172,7 +220,7 @@ const Sidebar = ({ onSelectHistory, onRefresh, refreshTrigger }) => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h3 style={{ margin: 0 }}>Workspace</h3>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button onClick={() => setIsModalOpen(true)} title="새 폴더 추가" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#4CAF50' }}>
+          <button onClick={() => openModal("create")} title="새 폴더 추가" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#4CAF50' }}>
             <FontAwesomeIcon icon={faPlus} />
           </button>
           <button onClick={fetchAllData} className="icon-refresh-btn" title="새로고침" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666' }}>
@@ -181,17 +229,21 @@ const Sidebar = ({ onSelectHistory, onRefresh, refreshTrigger }) => {
         </div>
       </div>
 
+      {/* ✅ 통합 모달 (생성/수정 공용) */}
       {isModalOpen && (
         <div style={{ position: 'absolute', top: '50px', left: '15px', right: '15px', background: 'white', border: '1px solid #ddd', padding: '15px', zIndex: 10, boxShadow: '0 4px 6px rgba(0,0,0,0.1)', borderRadius: '8px' }}>
-          <h4 style={{ margin: '0 0 10px 0' }}>새 폴더</h4>
+          <h4 style={{ margin: '0 0 10px 0' }}>{modalMode === "create" ? "새 폴더 추가" : "폴더 이름 수정"}</h4>
           <input 
             autoFocus style={{ width: '100%', padding: '8px', marginBottom: '10px', boxSizing: 'border-box' }}
-            value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleCreateCollection()}
+            value={folderNameInput} 
+            onChange={(e) => setFolderNameInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSaveCollection()}
             placeholder="이름 입력..."
           />
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '5px' }}>
-            <button onClick={handleCreateCollection} style={{ padding: '5px 10px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px' }}>생성</button>
+            <button onClick={handleSaveCollection} style={{ padding: '5px 10px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px' }}>
+              {modalMode === "create" ? "생성" : "저장"}
+            </button>
             <button onClick={() => setIsModalOpen(false)} style={{ padding: '5px 10px', background: '#ccc', border: 'none', borderRadius: '4px' }}>취소</button>
           </div>
         </div>
@@ -216,8 +268,26 @@ const Sidebar = ({ onSelectHistory, onRefresh, refreshTrigger }) => {
                   <span style={{ fontSize: '0.9em', fontWeight: 'bold' }}>{col.name}</span>
                 </div>
 
-                {/* ✅ 폴더 삭제 버튼 추가 (기록 삭제와 동일한 faTrashCan 아이콘) */}
-                <div className="item-actions">
+                <div className="item-actions" style={{ display: 'flex', gap: '10px' }}>
+                  {/* 단체 실행 버튼 */}
+                  <button 
+                    onClick={(e) => handleRunCollectionTest(e, col.collectionId)}
+                    title="폴더 내 전체 실행"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4CAF50' }}
+                  >
+                    <FontAwesomeIcon icon={faPlay} />
+                  </button>
+
+                  {/* ✅ 수정 버튼 추가 */}
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); openModal("edit", col); }}
+                    title="폴더 수정"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2196F3' }}
+                  >
+                    <FontAwesomeIcon icon={faPenToSquare} />
+                  </button>
+
+                  {/* 삭제 버튼 */}
                   <button 
                     onClick={(e) => handleDeleteCollection(e, col.collectionId)}
                     title="폴더 삭제"

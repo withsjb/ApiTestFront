@@ -56,10 +56,30 @@ function App() {
     fetchHistoryTrigger();
   };
 
-  const handleBulkResults = (bulkResults) => {
-    setResults(prev => [...bulkResults, ...prev]);
-    fetchHistoryTrigger();
-  };
+  const handleBulkResults = (bulkData) => {
+  // 1. 데이터 추출 (배열인지 객체인지 확인)
+  // res.data 자체가 배열일 수도 있고, { results: [] } 형태일 수도 있음
+  const rawList = Array.isArray(bulkData) ? bulkData : (bulkData.results || bulkData.details || []);
+
+  if (rawList.length === 0) {
+    console.warn("표시할 결과 데이터가 없습니다.");
+    return;
+  }
+
+  // 2. ResultTable.js의 필드명 규격에 맞게 매핑
+  const mappedResults = rawList.map((item, index) => ({
+    // ResultTable이 기대하는 key: 데이터에서 가져올 값 (없으면 대체값)
+    testcaseId: item.apiId || item.testcaseId || `bulk-${Date.now()}-${index}`,
+    method: item.method || 'GET',
+    url: item.apiUrl || item.url || 'N/A', // 👈 Sidebar는 apiUrl, CSV는 url일 수 있음
+    statusCode: item.statusCode || item.status || 0,
+    responseBody: item.responseBody || item.response || item.body || '응답 본문 없음' // 👈 필드명 불일치 해결
+  }));
+
+  // 3. 상태 업데이트 (최신 결과가 맨 위로)
+  setResults(prev => [...mappedResults, ...prev]);
+  fetchHistoryTrigger();
+};
 
   return (
     <AuthProvider>
@@ -79,6 +99,7 @@ function App() {
                       onSelectHistory={handleSelectHistory}
                       onRefresh={fetchHistoryTrigger}
                       refreshTrigger={refreshTrigger}
+                      onBulkResults={handleBulkResults}
                     />
                   </div>
 
