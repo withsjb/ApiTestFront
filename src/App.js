@@ -15,8 +15,8 @@ function App() {
   const [selectedHistory, setSelectedHistory] = useState(null);
   const [results, setResults] = useState([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [collections, setCollections] = useState([]);
 
-  // 사이드바 목록 갱신 트리거
   const fetchHistoryTrigger = () => {
     setRefreshTrigger(prev => prev + 1);
   };
@@ -25,23 +25,56 @@ function App() {
     setSelectedHistory(item);
   };
 
-  // API 실행
-  const handleSendRequest = async (formData) => {
-    try {
-      const response = await axios.post('/api/test', formData);
-      const newResult = {
-        testcaseId: Date.now(),
-        method: formData.method,
-        url: formData.url,
-        statusCode: response.data.statusCode || response.status,
-        responseBody: response.data.body
-      };
-      setResults(prev => [newResult, ...prev]);
-      fetchHistoryTrigger();
-    } catch (error) {
-      alert("요청 실패: " + (error.response?.data || error.message));
+  // ✅ API 실행 (평탄화된 데이터 구조 수용)
+  const handleSendRequest = async (flattenedData) => {
+    // 1. 전송용 데이터 복사 (원본 보존)
+    let payload = { ...flattenedData };
+
+    // 2. [상속 로직] 'Inherit_from_Parent'인 경우 폴더 정보 덮어쓰기
+    if (payload.authType === 'Inherit_from_Parent') {
+      // selectedHistory가 없더라도 payload에 collectionId가 있다면 그것을 우선 사용
+      const targetCollectionId = payload.collectionId || selectedHistory?.collectionId;
+      const parentFolder = collections.find(c => c.collectionId === targetCollectionId);
+
+      if (parentFolder && parentFolder.authType && parentFolder.authType !== 'No Auth') {
+        payload.authType = parentFolder.authType.replace(/ /g, '_');
+        payload.token = parentFolder.authToken || '';
+        payload.username = parentFolder.authUsername || '';
+        payload.password = parentFolder.authPassword || '';
+        payload.key = parentFolder.apiKey || '';
+        payload.value = parentFolder.apiValue || '';
+        console.log(`[상속 적용] '${parentFolder.name}' 폴더의 인증 정보를 사용합니다.`);
+      } else {
+        payload.authType = 'No_Auth';
+        console.log("[상속 알림] 상속받을 폴더 정보가 없어 'No Auth'로 진행합니다.");
+      }
     }
-  };
+
+      try {
+        // 3. 백엔드 전송 (이 API가 실행 결과와 함께 DB 저장을 수행함)
+        const response = await axios.post('/api/test', payload);
+        
+        // 4. 결과 테이블 업데이트용 데이터 구성
+        const newResult = {
+          testcaseId: response.data.apiId || Date.now(), // 백엔드에서 생성된 ID 우선 사용
+          method: payload.method,
+          url: payload.url,
+          statusCode: response.data.statusCode || response.status,
+          responseBody: response.data.body
+        };
+        
+        // 결과 리스트 상단에 추가
+        setResults(prev => [newResult, ...prev]);
+
+        // ✅ [중요] 실행 후 사이드바의 히스토리 목록을 즉시 새로고침
+        fetchHistoryTrigger(); 
+        
+        console.log("🚀 실행 및 저장 완료:", response.data);
+      } catch (error) {
+        console.error("전송 에러:", error);
+        alert("요청 실패: " + (error.response?.data?.message || error.message));
+      }
+    };
 
   // 신규 저장 및 갱신 공통
   const handleSaveToHistory = async (data) => {
@@ -57,29 +90,20 @@ function App() {
   };
 
   const handleBulkResults = (bulkData) => {
-  // 1. 데이터 추출 (배열인지 객체인지 확인)
-  // res.data 자체가 배열일 수도 있고, { results: [] } 형태일 수도 있음
-  const rawList = Array.isArray(bulkData) ? bulkData : (bulkData.results || bulkData.details || []);
+    const rawList = Array.isArray(bulkData) ? bulkData : (bulkData.results || bulkData.details || []);
+    if (rawList.length === 0) return;
 
-  if (rawList.length === 0) {
-    console.warn("표시할 결과 데이터가 없습니다.");
-    return;
-  }
+    const mappedResults = rawList.map((item, index) => ({
+      testcaseId: item.apiId || item.testcaseId || `bulk-${Date.now()}-${index}`,
+      method: item.method || 'GET',
+      url: item.apiUrl || item.url || 'N/A',
+      statusCode: item.statusCode || item.status || 0,
+      responseBody: item.responseBody || item.response || item.body || '응답 본문 없음'
+    }));
 
-  // 2. ResultTable.js의 필드명 규격에 맞게 매핑
-  const mappedResults = rawList.map((item, index) => ({
-    // ResultTable이 기대하는 key: 데이터에서 가져올 값 (없으면 대체값)
-    testcaseId: item.apiId || item.testcaseId || `bulk-${Date.now()}-${index}`,
-    method: item.method || 'GET',
-    url: item.apiUrl || item.url || 'N/A', // 👈 Sidebar는 apiUrl, CSV는 url일 수 있음
-    statusCode: item.statusCode || item.status || 0,
-    responseBody: item.responseBody || item.response || item.body || '응답 본문 없음' // 👈 필드명 불일치 해결
-  }));
-
-  // 3. 상태 업데이트 (최신 결과가 맨 위로)
-  setResults(prev => [...mappedResults, ...prev]);
-  fetchHistoryTrigger();
-};
+    setResults(prev => [...mappedResults, ...prev]);
+    fetchHistoryTrigger();
+  };
 
   return (
     <AuthProvider>
@@ -94,8 +118,10 @@ function App() {
               path="/"
               element={
                 <div style={{ display: 'flex', width: '100%' }}>
-                  <div style={{ width: '20%', borderRight: '1px solid #ccc', padding: '10px' }}>
+                  <div style={{ width: '25%', borderRight: '1px solid #ccc', padding: '10px', minHeight: '100vh' }}>
                     <Sidebar
+                      collections={collections}
+                      setCollections={setCollections}
                       onSelectHistory={handleSelectHistory}
                       onRefresh={fetchHistoryTrigger}
                       refreshTrigger={refreshTrigger}
@@ -103,7 +129,7 @@ function App() {
                     />
                   </div>
 
-                  <div style={{ width: '80%', padding: '20px' }}>
+                  <div style={{ width: '75%', padding: '20px' }}>
                     <div style={{display: 'flex', gap: '10px', marginBottom: '20px'}}>
                         <SampleFileDownload />
                         <FileUploader onResultsReceived={handleBulkResults} />

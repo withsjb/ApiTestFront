@@ -74,50 +74,93 @@ const ApiTester = ({ selectedHistory, onSendRequest, onSaveToHistory }) => {
 
   // 🔥 기록 수정 (PUT)
   const handleUpdateRecord = async () => {
-    if (!selectedHistory?.apiId) {
-        alert("수정할 기록이 선택되지 않았습니다.");
-        return;
-    }
+  if (!selectedHistory?.apiId) {
+      alert("수정할 기록이 선택되지 않았습니다.");
+      return;
+  }
 
-    if (!window.confirm("현재 내용으로 기존 기록을 업데이트하시겠습니까?")) return;
+  if (!window.confirm("현재 내용으로 기존 기록을 업데이트하시겠습니까?")) return;
 
-    // 백엔드 RequestData DTO 구조와 일치시킴
-    const dataToUpdate = {
+  // ✅ 모든 인증 정보를 백엔드 DTO(RequestData) 구조에 맞춰 평탄화(Flatten)
+  const dataToUpdate = {
+      method: formData.method,
+      url: formData.url,
+      body: formData.body,
+      // 'Inherit from Parent' -> 'Inherit_from_Parent'
+      authType: formData.authorization.authType.replace(/ /g, '_'),
+      
+      // ✅ authData 객체에서 값을 꺼내어 개별 필드로 전송
+      token: formData.authorization.authData?.token || '',
+      username: formData.authorization.authData?.username || '',
+      password: formData.authorization.authData?.password || '',
+      key: formData.authorization.authData?.key || '',
+      value: formData.authorization.authData?.value || '',
+      
+      params: formData.params.filter(p => p.key || p.value),
+      headers: formData.headers.filter(h => h.key || h.value),
+      
+      // ✅ 폴더 유지를 위해 선택된 기록의 collectionId를 반드시 포함
+      collectionId: selectedHistory.collectionId
+  };
+
+  try {
+      console.log("전송 데이터 확인:", dataToUpdate); // 디버깅용 로그
+      await axios.put(`/api/history/${selectedHistory.apiId}`, dataToUpdate);
+      alert("기록이 수정되었습니다.");
+      if (onSaveToHistory) onSaveToHistory(); 
+  } catch (error) {
+      console.error("수정 오류:", error);
+      alert("수정 실패");
+  }
+};
+
+  const handleSaveAsNew = () => {
+    const dataToSave = {
         method: formData.method,
         url: formData.url,
         body: formData.body,
         authType: formData.authorization.authType.replace(/ /g, '_'),
+        
+        // ✅ 개별 필드로 전송 (이게 빠지면 백엔드 DTO가 null로 받음)
         token: formData.authorization.authData?.token || '',
-        // 상세 authData 필드들 매핑
         username: formData.authorization.authData?.username || '',
         password: formData.authorization.authData?.password || '',
         key: formData.authorization.authData?.key || '',
         value: formData.authorization.authData?.value || '',
+        
         params: formData.params.filter(p => p.key || p.value),
         headers: formData.headers.filter(h => h.key || h.value),
+        collectionId: selectedHistory?.collectionId || null
     };
-
-    try {
-        // 백엔드 @PutMapping("/history/{requestId}") 경로와 일치해야 함
-        await axios.put(`/api/history/${selectedHistory.apiId}`, dataToUpdate);
-        alert("기록이 수정되었습니다.");
-        if (onSaveToHistory) onSaveToHistory(); 
-    } catch (error) {
-        console.error("수정 중 오류 발생:", error);
-        // 에러 메시지가 객체인 경우 문자열로 변환하여 출력
-        const errorMsg = error.response?.data?.message || error.response?.data || error.message;
-        alert("수정 실패: " + (typeof errorMsg === 'object' ? JSON.stringify(errorMsg) : errorMsg));
-    }
-  };
-
-  const handleSaveAsNew = () => {
-    onSaveToHistory(formData); 
+    onSaveToHistory(dataToSave); 
   };
 
   const handleSubmit = (e) => {
-    e.preventDefault();
-    onSendRequest(formData);
+  e.preventDefault();
+
+  // ✅ Send Request 시에도 데이터를 평탄화하여 백엔드 DTO 구조와 맞춤
+  const dataToSend = {
+    method: formData.method,
+    url: formData.url,
+    body: formData.body,
+    authType: formData.authorization.authType.replace(/ /g, '_'),
+    
+    // 인증 필드 개별 매핑
+    token: formData.authorization.authData?.token || '',
+    username: formData.authorization.authData?.username || '',
+    password: formData.authorization.authData?.password || '',
+    key: formData.authorization.authData?.key || '',
+    value: formData.authorization.authData?.value || '',
+    
+    params: formData.params.filter(p => p.key || p.value),
+    headers: formData.headers.filter(h => h.key || h.value),
+    
+    // 현재 선택된 폴더가 있다면 포함 (없으면 null)
+    collectionId: selectedHistory?.collectionId || null
   };
+
+  onSendRequest(dataToSend); // 평탄화된 데이터를 부모(App.js)로 전달
+};
 
   const handleAuthChange = (authDetails) => setFormData(prev => ({ ...prev, authorization: authDetails }));
   const handleAddParam = () => setFormData(prev => ({ ...prev, params: [...prev.params, { key: '', value: '' }] }));

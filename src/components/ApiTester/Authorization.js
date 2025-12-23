@@ -1,10 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-const Authorization = ({ onAuthChange }) => {
+const Authorization = ({ onAuthChange, initialAuth }) => {
   // 초기 기본값 정의
   const initialAuthType = 'No Auth';
   const initialDataMap = {
+    'Inherit from Parent': {},
     'No Auth': {},
     'Basic Auth': { username: '', password: '' },
     'Bearer Token': { token: '' },
@@ -13,6 +14,13 @@ const Authorization = ({ onAuthChange }) => {
 
   const [authType, setAuthType] = useState(initialAuthType);
   const [authData, setAuthData] = useState(initialDataMap[initialAuthType]);
+
+  useEffect(() => {
+    if (initialAuth) {
+      setAuthType(initialAuth.authType);
+      setAuthData(initialAuth.authData || {});
+    }
+  }, [initialAuth]);
 
   // 1. Auth Type 변경 핸들러
   const handleAuthTypeChange = (e) => {
@@ -43,11 +51,18 @@ const Authorization = ({ onAuthChange }) => {
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
         <label>Auth Type:</label>
         <select value={authType} onChange={handleAuthTypeChange}>
+          <option value="Inherit from Parent">Inherit from Parent</option>
           <option value="No Auth">No Auth</option>
           <option value="Basic Auth">Basic Auth</option>
           <option value="Bearer Token">Bearer Token</option>
           <option value="API Key">API Key</option>
         </select>
+
+        {authType === 'Inherit from Parent' && (
+          <span style={{ fontSize: '0.85em', color: '#666', fontStyle: 'italic' }}>
+            * 부모 폴더의 인증 설정을 사용합니다.
+          </span>
+        )}
 
         {/* Authorization 타입별 입력 필드 */}
         {authType === 'Basic Auth' && (

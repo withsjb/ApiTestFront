@@ -9,18 +9,27 @@ import {
   faPlay 
 } from '@fortawesome/free-solid-svg-icons';
 
-const Sidebar = ({ onSelectHistory, onRefresh, refreshTrigger, onBulkResults }) => {
+// ✅ 부모(App.js)로부터 collections와 setCollections를 props로 받습니다.
+const Sidebar = ({ collections, setCollections, onSelectHistory, onRefresh, refreshTrigger, onBulkResults }) => {
   const [history, setHistory] = useState([]);
-  const [collections, setCollections] = useState([]);
+  // const [collections, setCollections] = useState([]); // ❌ 이 줄을 삭제했습니다.
   const [loading, setLoading] = useState(false);
   const [openCollections, setOpenCollections] = useState({});
   
-  // ✅ 모달 관련 상태 통합
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState("create"); // "create" 또는 "edit"
+  const [modalMode, setModalMode] = useState("create"); 
   const [folderNameInput, setFolderNameInput] = useState("");
   const [editingCollectionId, setEditingCollectionId] = useState(null);
 
+  const [folderAuth, setFolderAuth] = useState({
+    authType: 'No Auth',
+    token: '',
+    username: '',
+    password: '',
+    apiKey: '',
+    apiValue: ''
+  });
+  
   const [movingItemId, setMovingItemId] = useState(null); 
   const userId = 1; 
 
@@ -38,7 +47,9 @@ const Sidebar = ({ onSelectHistory, onRefresh, refreshTrigger, onBulkResults }) 
         axios.get('/api/history')
       ]);
 
+      // ✅ 부모의 상태를 업데이트하여 App.js에서도 최신 폴더 목록을 알게 합니다.
       setCollections(colRes.data);
+      
       const uniqueData = histRes.data.map((item, index) => ({
         ...item,
         safeKey: item.apiId ?? `temp-${index}`
@@ -51,43 +62,51 @@ const Sidebar = ({ onSelectHistory, onRefresh, refreshTrigger, onBulkResults }) 
     }
   };
 
-  // ✅ 모달 열기 함수 (모드에 따라 초기값 설정)
   const openModal = (mode, collection = null) => {
     setModalMode(mode);
     if (mode === "edit" && collection) {
       setEditingCollectionId(collection.collectionId);
       setFolderNameInput(collection.name);
+      setFolderAuth({
+        authType: collection.authType || 'No Auth',
+        token: collection.authToken || '',
+        username: collection.authUsername || '',
+        password: collection.authPassword || '',
+        apiKey: collection.apiKey || '',
+        apiValue: collection.apiValue || ''
+      });
     } else {
       setEditingCollectionId(null);
       setFolderNameInput("");
+      setFolderAuth({ authType: 'No Auth', token: '', username: '', password: '', apiKey: '', apiValue: '' });
     }
     setIsModalOpen(true);
   };
 
-  // ✅ 폴더 저장 (생성/수정 통합)
   const handleSaveCollection = async () => {
     if (!folderNameInput.trim()) return;
     
+    const collectionData = {
+      name: folderNameInput,
+      userId: userId,
+      authType: folderAuth.authType,
+      authToken: folderAuth.token,
+      authUsername: folderAuth.username,
+      authPassword: folderAuth.password,
+      apiKey: folderAuth.apiKey,
+      apiValue: folderAuth.apiValue
+    };
+
     try {
-        if (modalMode === "create") {
-            // 생성 로직
-            await axios.post('/api/collections', {
-                name: folderNameInput,
-                userId: userId,
-                sortOrder: collections.length 
-            });
-        } else {
-            // 수정 로직 (PATCH)
-            await axios.patch(`/api/collections/${editingCollectionId}`, {
-                name: folderNameInput
-            });
-        }
-        
-        setFolderNameInput("");
-        setIsModalOpen(false);
-        fetchAllData(); 
+      if (modalMode === "create") {
+        await axios.post('/api/collections', collectionData);
+      } else {
+        await axios.patch(`/api/collections/${editingCollectionId}`, collectionData);
+      }
+      setIsModalOpen(false);
+      fetchAllData(); 
     } catch (err) {
-        alert(`폴더 ${modalMode === "create" ? "생성" : "수정"}에 실패했습니다.`);
+      alert("폴더 저장에 실패했습니다.");
     }
   };
 
@@ -116,7 +135,6 @@ const Sidebar = ({ onSelectHistory, onRefresh, refreshTrigger, onBulkResults }) 
       if (onBulkResults && details) {
         onBulkResults(details); 
       }
-      console.log("결과 데이터:", details)
       fetchAllData(); 
       if (onRefresh) onRefresh();
     } catch (err) {
@@ -127,21 +145,41 @@ const Sidebar = ({ onSelectHistory, onRefresh, refreshTrigger, onBulkResults }) 
     }
   };
 
+  // Sidebar.js 내의 handleMoveItem 함수 수정
   const handleMoveItem = async (item, targetCollectionId) => {
     try {
+      // 1. 기존 데이터 유지를 위해 item 전체를 복사하고 필요한 부분만 수정/추가
       const refinedItem = {
         ...item, 
-        url: item.url || item.apiUrl, 
+        url: item.apiUrl || item.url, // 필드명 호환성 유지
         collectionId: targetCollectionId,
-        params: typeof item.params === 'string' ? JSON.parse(item.params || '[]') : item.params,
-        headers: typeof item.headers === 'string' ? JSON.parse(item.headers || '[]') : item.headers,
-        authData: typeof item.authData === 'string' ? JSON.parse(item.authData || '{}') : item.authData
+        
+        // ✅ [중요] 평탄화된 인증 필드들을 명시적으로 포함
+        // DB에서 가져온 필드명(authUsername 등)과 DTO 필드명(username 등)을 매핑
+        authType: item.authType ? item.authType.replace(/ /g, '_') : 'No_Auth',
+        token: item.authorization || item.token || '',
+        username: item.authUsername || item.username || '',
+        password: item.authPassword || item.password || '',
+        key: item.apiKey || item.key || '',
+        value: item.apiValue || item.value || '',
+
+        // JSON 필드 파싱 처리
+        params: typeof item.params === 'string' ? JSON.parse(item.params || '[]') : (item.params || []),
+        headers: typeof item.headers === 'string' ? JSON.parse(item.headers || '[]') : (item.headers || []),
+        body: item.body || ''
       };
 
+      console.log("🚀 폴더 이동 요청 데이터:", refinedItem);
+
+      // 2. 백엔드 업데이트 호출
       await axios.put(`/api/history/${item.apiId}`, refinedItem);
+      
+      // 3. 상태 초기화 및 갱신
       setMovingItemId(null);
       fetchAllData();
       if (onRefresh) onRefresh();
+      
+      alert("폴더 이동 완료");
     } catch (err) {
       console.error("이동 실패 상세:", err);
       alert("폴더 이동 실패");
@@ -229,22 +267,84 @@ const Sidebar = ({ onSelectHistory, onRefresh, refreshTrigger, onBulkResults }) 
         </div>
       </div>
 
-      {/* ✅ 통합 모달 (생성/수정 공용) */}
+      {/* 통합 모달 */}
       {isModalOpen && (
-        <div style={{ position: 'absolute', top: '50px', left: '15px', right: '15px', background: 'white', border: '1px solid #ddd', padding: '15px', zIndex: 10, boxShadow: '0 4px 6px rgba(0,0,0,0.1)', borderRadius: '8px' }}>
-          <h4 style={{ margin: '0 0 10px 0' }}>{modalMode === "create" ? "새 폴더 추가" : "폴더 이름 수정"}</h4>
-          <input 
-            autoFocus style={{ width: '100%', padding: '8px', marginBottom: '10px', boxSizing: 'border-box' }}
-            value={folderNameInput} 
-            onChange={(e) => setFolderNameInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSaveCollection()}
-            placeholder="이름 입력..."
-          />
+        <div style={{ 
+          position: 'absolute', top: '50px', left: '15px', right: '15px', 
+          background: 'white', border: '1px solid #ddd', padding: '15px', 
+          zIndex: 10, boxShadow: '0 4px 15px rgba(0,0,0,0.2)', borderRadius: '8px' 
+        }}>
+          <h4 style={{ margin: '0 0 15px 0' }}>{modalMode === "create" ? "새 폴더 추가" : "폴더 설정"}</h4>
+          
+          <div style={{ marginBottom: '10px' }}>
+            <label style={{ fontSize: '0.75em', color: '#666' }}>폴더 이름</label>
+            <input 
+              autoFocus style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
+              value={folderNameInput} 
+              onChange={(e) => setFolderNameInput(e.target.value)}
+              placeholder="이름 입력..."
+            />
+          </div>
+
+          <div style={{ marginBottom: '10px' }}>
+            <label style={{ fontSize: '0.75em', color: '#666' }}>기본 인증 (상속용)</label>
+            <select 
+              style={{ width: '100%', padding: '8px' }}
+              value={folderAuth.authType}
+              onChange={(e) => setFolderAuth({ ...folderAuth, authType: e.target.value })}
+            >
+              <option value="No Auth">No Auth</option>
+              <option value="Bearer Token">Bearer Token</option>
+              <option value="Basic Auth">Basic Auth</option>
+              <option value="API Key">API Key</option>
+            </select>
+          </div>
+
+          <div style={{ marginBottom: '10px', background: '#f9f9f9', padding: folderAuth.authType === 'No Auth' ? '0' : '10px', borderRadius: '4px' }}>
+            {folderAuth.authType === 'Bearer Token' && (
+              <input 
+                placeholder="Token" style={{ width: '100%', padding: '8px' }}
+                value={folderAuth.token}
+                onChange={(e) => setFolderAuth({ ...folderAuth, token: e.target.value })}
+              />
+            )}
+            {folderAuth.authType === 'Basic Auth' && (
+              <>
+                <input 
+                  placeholder="Username" style={{ width: '100%', padding: '8px', marginBottom: '5px' }}
+                  value={folderAuth.username}
+                  onChange={(e) => setFolderAuth({ ...folderAuth, username: e.target.value })}
+                />
+                <input 
+                  type="password" placeholder="Password" style={{ width: '100%', padding: '8px' }}
+                  value={folderAuth.password}
+                  onChange={(e) => setFolderAuth({ ...folderAuth, password: e.target.value })}
+                />
+              </>
+            )}
+            {folderAuth.authType === 'API Key' && (
+              <>
+                <input 
+                  placeholder="Key" style={{ width: '100%', padding: '8px', marginBottom: '5px' }}
+                  value={folderAuth.apiKey}
+                  onChange={(e) => setFolderAuth({ ...folderAuth, apiKey: e.target.value })}
+                />
+                <input 
+                  placeholder="Value" style={{ width: '100%', padding: '8px' }}
+                  value={folderAuth.apiValue}
+                  onChange={(e) => setFolderAuth({ ...folderAuth, apiValue: e.target.value })}
+                />
+              </>
+            )}
+          </div>
+
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '5px' }}>
-            <button onClick={handleSaveCollection} style={{ padding: '5px 10px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px' }}>
-              {modalMode === "create" ? "생성" : "저장"}
+            <button onClick={handleSaveCollection} style={{ padding: '6px 12px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+              저장
             </button>
-            <button onClick={() => setIsModalOpen(false)} style={{ padding: '5px 10px', background: '#ccc', border: 'none', borderRadius: '4px' }}>취소</button>
+            <button onClick={() => setIsModalOpen(false)} style={{ padding: '6px 12px', background: '#ccc', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+              취소
+            </button>
           </div>
         </div>
       )}
@@ -269,30 +369,13 @@ const Sidebar = ({ onSelectHistory, onRefresh, refreshTrigger, onBulkResults }) 
                 </div>
 
                 <div className="item-actions" style={{ display: 'flex', gap: '10px' }}>
-                  {/* 단체 실행 버튼 */}
-                  <button 
-                    onClick={(e) => handleRunCollectionTest(e, col.collectionId)}
-                    title="폴더 내 전체 실행"
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4CAF50' }}
-                  >
+                  <button onClick={(e) => handleRunCollectionTest(e, col.collectionId)} title="폴더 내 전체 실행" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4CAF50' }}>
                     <FontAwesomeIcon icon={faPlay} />
                   </button>
-
-                  {/* ✅ 수정 버튼 추가 */}
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); openModal("edit", col); }}
-                    title="폴더 수정"
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2196F3' }}
-                  >
+                  <button onClick={(e) => { e.stopPropagation(); openModal("edit", col); }} title="폴더 수정" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2196F3' }}>
                     <FontAwesomeIcon icon={faPenToSquare} />
                   </button>
-
-                  {/* 삭제 버튼 */}
-                  <button 
-                    onClick={(e) => handleDeleteCollection(e, col.collectionId)}
-                    title="폴더 삭제"
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f44336' }}
-                  >
+                  <button onClick={(e) => handleDeleteCollection(e, col.collectionId)} title="폴더 삭제" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f44336' }}>
                     <FontAwesomeIcon icon={faTrashCan} />
                   </button>
                 </div>
@@ -314,7 +397,6 @@ const Sidebar = ({ onSelectHistory, onRefresh, refreshTrigger, onBulkResults }) 
 
       <hr style={{ border: '0.5px solid #eee', margin: '20px 0' }} />
 
-      {/* UNCLASSIFIED */}
       <div className="sidebar-section">
         <h4 style={{ color: '#888', fontSize: '0.8em', marginBottom: '10px' }}>UNCLASSIFIED</h4>
         <ul style={{ listStyle: 'none', padding: 0 }}>
