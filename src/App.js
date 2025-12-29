@@ -26,13 +26,24 @@ function App() {
   };
 
   // ✅ API 실행 (평탄화된 데이터 구조 수용)
-  const handleSendRequest = async (flattenedData) => {
-    // 1. 전송용 데이터 복사 (원본 보존)
-    let payload = { ...flattenedData };
+  // App.js 내 handleSendRequest 수정
 
-    // 2. [상속 로직] 'Inherit_from_Parent'인 경우 폴더 정보 덮어쓰기
+  const handleSendRequest = async (flattenedData) => {
+    // 1. 디버깅용 로그 추가 (어떤 데이터가 넘어오는지 확인)
+    console.log("받은 데이터(flattenedData):", flattenedData);
+    console.log("현재 선택된 기록(selectedHistory):", selectedHistory);
+
+    // 2. Payload 구성 - apiId를 최우선으로 확보
+    // flattenedData에 apiId가 없더라도 selectedHistory에 있다면 그것을 사용합니다.
+    const apiId = selectedHistory?.apiId || flattenedData?.apiId || null;
+
+    let payload = { 
+      ...flattenedData,
+      apiId: apiId 
+    };
+
+    // 3. 상속 로직 (기존 유지)
     if (payload.authType === 'Inherit_from_Parent') {
-      // selectedHistory가 없더라도 payload에 collectionId가 있다면 그것을 우선 사용
       const targetCollectionId = payload.collectionId || selectedHistory?.collectionId;
       const parentFolder = collections.find(c => c.collectionId === targetCollectionId);
 
@@ -43,38 +54,33 @@ function App() {
         payload.password = parentFolder.authPassword || '';
         payload.key = parentFolder.apiKey || '';
         payload.value = parentFolder.apiValue || '';
-        console.log(`[상속 적용] '${parentFolder.name}' 폴더의 인증 정보를 사용합니다.`);
       } else {
         payload.authType = 'No_Auth';
-        console.log("[상속 알림] 상속받을 폴더 정보가 없어 'No Auth'로 진행합니다.");
       }
     }
 
-      try {
-        // 3. 백엔드 전송 (이 API가 실행 결과와 함께 DB 저장을 수행함)
-        const response = await axios.post('/api/test', payload);
-        
-        // 4. 결과 테이블 업데이트용 데이터 구성
-        const newResult = {
-          testcaseId: response.data.apiId || Date.now(), // 백엔드에서 생성된 ID 우선 사용
-          method: payload.method,
-          url: payload.url,
-          statusCode: response.data.statusCode || response.status,
-          responseBody: response.data.body
-        };
-        
-        // 결과 리스트 상단에 추가
-        setResults(prev => [newResult, ...prev]);
+    // 🚀 최종 Payload 확인 (콘솔에 이 객체가 제대로 찍혀야 합니다)
+    console.log("최종 전송 Payload:", payload);
 
-        // ✅ [중요] 실행 후 사이드바의 히스토리 목록을 즉시 새로고침
-        fetchHistoryTrigger(); 
-        
-        console.log("🚀 실행 및 저장 완료:", response.data);
-      } catch (error) {
-        console.error("전송 에러:", error);
-        alert("요청 실패: " + (error.response?.data?.message || error.message));
-      }
-    };
+    try {
+      const response = await axios.post('/api/test', payload);
+      
+      const newResult = {
+        testcaseId: response.data.apiId || Date.now(),
+        method: payload.method,
+        url: payload.url,
+        statusCode: response.data.statusCode || response.status,
+        responseBody: response.data.body
+      };
+      
+      setResults(prev => [newResult, ...prev]);
+      fetchHistoryTrigger(); 
+      
+    } catch (error) {
+      console.error("전송 에러:", error);
+      alert("요청 실패: " + (error.response?.data?.message || error.message));
+    }
+  };
 
   // 신규 저장 및 갱신 공통
   const handleSaveToHistory = async (data) => {
@@ -138,6 +144,7 @@ function App() {
                       selectedHistory={selectedHistory}
                       onSendRequest={handleSendRequest}
                       onSaveToHistory={handleSaveToHistory}
+                      onSelectHistory={setSelectedHistory}
                     />
                     <ResultTable results={results} />
                   </div>

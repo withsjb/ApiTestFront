@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import axios from '../../api/axiosInstance';
 import './Sidebar.css';
 
@@ -10,7 +10,8 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 // ✅ 부모(App.js)로부터 collections와 setCollections를 props로 받습니다.
-const Sidebar = ({ collections, setCollections, onSelectHistory, onRefresh, refreshTrigger, onBulkResults }) => {
+const Sidebar = ({ collections, setCollections, onSelectHistory, onRefresh, 
+  refreshTrigger, onBulkResults }) => {
   const [history, setHistory] = useState([]);
   // const [collections, setCollections] = useState([]); // ❌ 이 줄을 삭제했습니다.
   const [loading, setLoading] = useState(false);
@@ -33,13 +34,8 @@ const Sidebar = ({ collections, setCollections, onSelectHistory, onRefresh, refr
   const [movingItemId, setMovingItemId] = useState(null); 
   const userId = 1; 
 
-  useEffect(() => {
-    fetchAllData();
-    const intervalId = setInterval(fetchAllData, 600000);
-    return () => clearInterval(intervalId);
-  }, [refreshTrigger]);
-
-  const fetchAllData = async () => {
+  
+  const fetchAllData = useCallback(async () => {
     setLoading(true);
     try {
       const [colRes, histRes] = await Promise.all([
@@ -60,7 +56,13 @@ const Sidebar = ({ collections, setCollections, onSelectHistory, onRefresh, refr
     } finally {
       setLoading(false);
     }
-  };
+  }, [setCollections]);
+  
+  useEffect(() => {
+    fetchAllData();
+    const intervalId = setInterval(fetchAllData, 600000);
+    return () => clearInterval(intervalId);
+  }, [refreshTrigger, fetchAllData]);
 
   const openModal = (mode, collection = null) => {
     setModalMode(mode);
@@ -162,6 +164,13 @@ const Sidebar = ({ collections, setCollections, onSelectHistory, onRefresh, refr
         password: item.authPassword || item.password || '',
         key: item.apiKey || item.key || '',
         value: item.apiValue || item.value || '',
+        // ✅ [추가] OAuth 2.0 상세 필드들 - 이 부분이 빠져있어서 증발했던 것입니다!
+        tokenUrl: item.authTokenUrl || '',    // DB 필드명(authTokenUrl)을 DTO명(tokenUrl)으로 매핑
+        grantType: item.grantType || '',
+        scope: item.authScope || '',          // DB 필드명(authScope)을 DTO명(scope)으로 매핑
+        clientId: item.clientId || '',
+        clientSecret: item.clientSecret || '',
+        clientAuthMethod: item.clientAuthMethod || 'header',
 
         // JSON 필드 파싱 처리
         params: typeof item.params === 'string' ? JSON.parse(item.params || '[]') : (item.params || []),

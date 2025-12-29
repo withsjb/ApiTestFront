@@ -3,7 +3,7 @@ import './ApiTester.css';
 import Authorization from './Authorization';
 import axios from '../../api/axiosInstance'; 
 
-const ApiTester = ({ selectedHistory, onSendRequest, onSaveToHistory }) => {
+const ApiTester = ({ selectedHistory, onSendRequest, onSaveToHistory, onSelectHistory }) => {
   
   const [formData, setFormData] = useState({
     method: 'GET',
@@ -14,12 +14,13 @@ const ApiTester = ({ selectedHistory, onSendRequest, onSaveToHistory }) => {
     body: '',
   });
 
-  // 🔹 Authorization 객체 재구성
   const reconstructAuthDetails = useCallback((history) => {
       const mapAuthTypeToUI = (dbAuthType) => {
-          if (!dbAuthType) return 'No Auth';
-          return dbAuthType.replace(/_/g, ' ');
-      };
+        if (!dbAuthType) return 'No Auth';
+        // ✅ 언더바(_)를 공백( )으로 반드시 바꿔서 UI 옵션값과 일치시켜야 합니다.
+        if (dbAuthType === 'OAuth_2_0') return 'OAuth 2.0'; 
+        return dbAuthType.replace(/_/g, ' ');
+    };
 
       const authType = history.authType || 'No_Auth';
       const uiAuthType = mapAuthTypeToUI(authType);
@@ -33,6 +34,17 @@ const ApiTester = ({ selectedHistory, onSendRequest, onSaveToHistory }) => {
           case 'Bearer_Token':
               authDetails.authData = { token: history.authorization };
               break;
+          case 'OAuth_2_0': 
+              authDetails.authData = { 
+                  accessToken: history.authorization,
+                  accessTokenUrl: history.authTokenUrl,
+                  grantType: history.grantType,
+                  scope: history.authScope,
+                  clientId: history.clientId,
+                  clientSecret: history.clientSecret,
+                  clientAuthMethod: history.clientAuthMethod || 'header'
+              };
+              break;
           case 'Basic_Auth':
               authDetails.authData = { username: history.authUsername, password: history.authPassword };
               break;
@@ -45,7 +57,6 @@ const ApiTester = ({ selectedHistory, onSendRequest, onSaveToHistory }) => {
       return authDetails;
   }, []);
 
-  // 🔹 JSON 필드 파싱 (빈 배열 방지)
   const parseJSONField = (field) => {
     if (!field || (typeof field === 'string' && field.trim() === '')) return [{ key: '', value: '' }];
     let result;
@@ -57,7 +68,6 @@ const ApiTester = ({ selectedHistory, onSendRequest, onSaveToHistory }) => {
     return (!Array.isArray(result) || result.length === 0) ? [{ key: '', value: '' }] : result;
   };
 
-  // 🔹 선택된 기록 로드
   useEffect(() => {
     if (selectedHistory) {
       const authDetails = reconstructAuthDetails(selectedHistory);
@@ -72,95 +82,81 @@ const ApiTester = ({ selectedHistory, onSendRequest, onSaveToHistory }) => {
     }
   }, [selectedHistory, reconstructAuthDetails]);
 
-  // 🔥 기록 수정 (PUT)
-  const handleUpdateRecord = async () => {
-  if (!selectedHistory?.apiId) {
-      alert("수정할 기록이 선택되지 않았습니다.");
-      return;
-  }
-
-  if (!window.confirm("현재 내용으로 기존 기록을 업데이트하시겠습니까?")) return;
-
-  // ✅ 모든 인증 정보를 백엔드 DTO(RequestData) 구조에 맞춰 평탄화(Flatten)
-  const dataToUpdate = {
+  const getFormattedData = () => {
+    const { authType, authData } = formData.authorization;
+    
+    return {
       method: formData.method,
       url: formData.url,
       body: formData.body,
-      // 'Inherit from Parent' -> 'Inherit_from_Parent'
-      authType: formData.authorization.authType.replace(/ /g, '_'),
+      authType: authType.replace(/[\s.]/g, '_'),
       
-      // ✅ authData 객체에서 값을 꺼내어 개별 필드로 전송
-      token: formData.authorization.authData?.token || '',
-      username: formData.authorization.authData?.username || '',
-      password: formData.authorization.authData?.password || '',
-      key: formData.authorization.authData?.key || '',
-      value: formData.authorization.authData?.value || '',
+      token: authData.accessToken || authData.token || '',
+      tokenUrl: authData.accessTokenUrl || '',
+      grantType: authData.grantType || '',
+      scope: authData.scope || '',
+      clientId: authData.clientId || '',
+      clientSecret: authData.clientSecret || '',
+      clientAuthMethod: authData.clientAuthMethod || 'header',
+      
+      username: authData.username || '',
+      password: authData.password || '',
+      key: authData.key || '',
+      value: authData.value || '',
       
       params: formData.params.filter(p => p.key || p.value),
       headers: formData.headers.filter(h => h.key || h.value),
-      
-      // ✅ 폴더 유지를 위해 선택된 기록의 collectionId를 반드시 포함
-      collectionId: selectedHistory.collectionId
+      collectionId: selectedHistory?.collectionId || null
+    };
   };
 
-  try {
-      console.log("전송 데이터 확인:", dataToUpdate); // 디버깅용 로그
-      await axios.put(`/api/history/${selectedHistory.apiId}`, dataToUpdate);
-      alert("기록이 수정되었습니다.");
-      if (onSaveToHistory) onSaveToHistory(); 
-  } catch (error) {
-      console.error("수정 오류:", error);
-      alert("수정 실패");
-  }
-};
+  const handleReset = () => {
+    setFormData({
+      method: 'GET',
+      url: '',
+      authorization: { authType: 'No Auth', authData: {} },
+      params: [{ key: '', value: '' }],
+      headers: [{ key: '', value: '' }],
+      body: '',
+    });
+    if (onSelectHistory) onSelectHistory(null);
+  };
+
+  const handleUpdateRecord = async () => {
+    if (!selectedHistory?.apiId) {
+        alert("수정할 기록이 선택되지 않았습니다.");
+        return;
+    }
+    if (!window.confirm("현재 내용으로 기존 기록을 업데이트하시겠습니까?")) return;
+
+    try {
+        await axios.put(`/api/history/${selectedHistory.apiId}`, getFormattedData());
+        alert("기록이 수정되었습니다.");
+        if (onSaveToHistory) onSaveToHistory(); 
+    } catch (error) {
+        console.error("수정 오류:", error);
+        alert("수정 실패");
+    }
+  };
 
   const handleSaveAsNew = () => {
-    const dataToSave = {
-        method: formData.method,
-        url: formData.url,
-        body: formData.body,
-        authType: formData.authorization.authType.replace(/ /g, '_'),
-        
-        // ✅ 개별 필드로 전송 (이게 빠지면 백엔드 DTO가 null로 받음)
-        token: formData.authorization.authData?.token || '',
-        username: formData.authorization.authData?.username || '',
-        password: formData.authorization.authData?.password || '',
-        key: formData.authorization.authData?.key || '',
-        value: formData.authorization.authData?.value || '',
-        
-        params: formData.params.filter(p => p.key || p.value),
-        headers: formData.headers.filter(h => h.key || h.value),
-        collectionId: selectedHistory?.collectionId || null
-    };
-    onSaveToHistory(dataToSave); 
+    onSaveToHistory(getFormattedData()); 
   };
 
-  const handleSubmit = (e) => {
-  e.preventDefault();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const dataToSend = getFormattedData();
 
-  // ✅ Send Request 시에도 데이터를 평탄화하여 백엔드 DTO 구조와 맞춤
-  const dataToSend = {
-    method: formData.method,
-    url: formData.url,
-    body: formData.body,
-    authType: formData.authorization.authType.replace(/ /g, '_'),
-    
-    // 인증 필드 개별 매핑
-    token: formData.authorization.authData?.token || '',
-    username: formData.authorization.authData?.username || '',
-    password: formData.authorization.authData?.password || '',
-    key: formData.authorization.authData?.key || '',
-    value: formData.authorization.authData?.value || '',
-    
-    params: formData.params.filter(p => p.key || p.value),
-    headers: formData.headers.filter(h => h.key || h.value),
-    
-    // 현재 선택된 폴더가 있다면 포함 (없으면 null)
-    collectionId: selectedHistory?.collectionId || null
+    if (selectedHistory?.apiId) {
+      try {
+        await axios.put(`/api/history/${selectedHistory.apiId}`, dataToSend);
+        if (onSaveToHistory) onSaveToHistory(); 
+      } catch (err) {
+        console.error("자동 업데이트 실패:", err);
+      }
+    }
+    onSendRequest(dataToSend);
   };
-
-  onSendRequest(dataToSend); // 평탄화된 데이터를 부모(App.js)로 전달
-};
 
   const handleAuthChange = (authDetails) => setFormData(prev => ({ ...prev, authorization: authDetails }));
   const handleAddParam = () => setFormData(prev => ({ ...prev, params: [...prev.params, { key: '', value: '' }] }));
@@ -168,7 +164,19 @@ const ApiTester = ({ selectedHistory, onSendRequest, onSaveToHistory }) => {
 
   return (
     <div className="api-tester-container">
-      <h3>API Tester {selectedHistory && <span style={{fontSize: '0.7em', color: '#ff9800'}}>(기록 수정 중)</span>}</h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignitEm: 'center', marginBottom: '15px' }}>
+        <h3 style={{ margin: 0 }}>
+          API Tester {selectedHistory && <span style={{fontSize: '0.7em', color: '#ff9800'}}>(기록 수정 중)</span>}
+        </h3>
+        <button 
+          type="button" 
+          onClick={handleReset} 
+          style={{ padding: '5px 12px', cursor: 'pointer', background: '#f0f0f0', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.8em' }}
+        >
+          + New Request
+        </button>
+      </div>
+
       <form onSubmit={handleSubmit}>
         <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
           <select value={formData.method} onChange={(e) => setFormData({ ...formData, method: e.target.value })}>
@@ -177,10 +185,21 @@ const ApiTester = ({ selectedHistory, onSendRequest, onSaveToHistory }) => {
             <option value="PUT">PUT</option>
             <option value="DELETE">DELETE</option>
           </select>
-          <input className="url-input" type="text" placeholder="https://api.example.com" value={formData.url} onChange={(e) => setFormData({ ...formData, url: e.target.value })} />
+          <input 
+            className="url-input" 
+            type="text" 
+            placeholder="https://api.example.com" 
+            value={formData.url} 
+            onChange={(e) => setFormData({ ...formData, url: e.target.value })} 
+          />
         </div>
 
-        <Authorization onAuthChange={handleAuthChange} initialAuth={formData.authorization} />
+        {/* ✅ 핵심: key 부여를 통해 selectedHistory가 바뀔 때마다 컴포넌트를 강제 리셋 */}
+        <Authorization 
+          key={selectedHistory?.apiId || 'new-request'} 
+          onAuthChange={handleAuthChange} 
+          initialAuth={formData.authorization} 
+        />
 
         <div className="section">
           <label>Params:</label>
