@@ -44,7 +44,17 @@ const AUTH_CONFIGS = {
       { id: 'awsService', label: 'Service Name', type: 'text', placeholder: 'e.g. s3, ec2, lambda' },
       { id: 'awsSessionToken', label: 'Session Token', type: 'text', placeholder: 'Optional Session Token', fullWidth: true }
     ]
-  }
+  },
+  'Digest Auth': {
+    isCard: true, // 여러 필드이므로 카드 레이아웃 사용
+    fields: [
+      { id: 'digestUsername', label: 'Username', type: 'text', placeholder: 'Enter username' },
+      { id: 'digestPassword', label: 'Password', type: 'password', placeholder: 'Enter password' },
+      { id: 'digestRealm', label: 'Realm', type: 'text', placeholder: 'Optional: example.com' },
+      { id: 'digestNonce', label: 'Nonce', type: 'text', placeholder: 'Optional: server nonce' },
+      { id: 'digestAlgorithm', label: 'Algorithm', type: 'select', options: ['MD5', 'SHA-256', 'MD5-sess'], note: '기본값은 MD5입니다.' }
+    ]
+  },
 };
 
 const Authorization = ({ onAuthChange, initialAuth }) => {
@@ -69,6 +79,7 @@ const Authorization = ({ onAuthChange, initialAuth }) => {
       config.fields.forEach(f => {
         if (f.id === 'grantType') newData[f.id] = 'client_credentials';
         else if (f.id === 'clientAuthMethod') newData[f.id] = 'header';
+        else if (f.id === 'digestAlgorithm') newData[f.id] = 'MD5';
         else newData[f.id] = '';
       });
     }

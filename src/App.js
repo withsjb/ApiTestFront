@@ -88,11 +88,11 @@ function App() {
   if (data) {
     try {
       // 서버에서 저장된 엔티티(apiId 포함)를 반환한다고 가정
-      // const response = await axios.post('/api/history/save', data);
+      const response = await axios.post('/api/history/save', data);
       alert("새로운 기록이 UNCLASSIFIED에 저장되었습니다.");
       
       // 필요하다면: 방금 저장한 기록을 편집 모드로 바로 전환
-      // setSelectedHistory(response.data); 
+      setSelectedHistory(response.data); 
     } catch (e) {
       console.error("저장 오류", e);
     }

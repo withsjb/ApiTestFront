@@ -60,6 +60,15 @@ const ApiTester = ({ selectedHistory, onSendRequest, onSaveToHistory, onSelectHi
                 awsSessionToken: history.awsSessionToken
             };
             break;
+          case 'Digest_Auth': // ✅ 추가
+            authDetails.authData = { 
+                digestUsername: history.authUsername, 
+                digestPassword: history.authPassword,
+                digestRealm: history.digestRealm,
+                digestNonce: history.digestNonce,
+                digestAlgorithm: history.digestAlgorithm || 'MD5'
+            };
+            break;
           default: 
               break;
       }
@@ -116,6 +125,11 @@ const ApiTester = ({ selectedHistory, onSendRequest, onSaveToHistory, onSelectHi
       awsRegion: authData.awsRegion || '',
       awsService: authData.awsService || '',
       awsSessionToken: authData.awsSessionToken || '',
+      digestUsername: authData.digestUsername || '',
+      digestPassword: authData.digestPassword || '',
+      digestRealm: authData.digestRealm || '',
+      digestNonce: authData.digestNonce || '',
+      digestAlgorithm: authData.digestAlgorithm || 'MD5',
       
       params: formData.params.filter(p => p.key || p.value),
       headers: formData.headers.filter(h => h.key || h.value),
