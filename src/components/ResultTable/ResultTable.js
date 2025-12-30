@@ -23,6 +23,7 @@ const ResultTable = ({ results }) => {
           <th>API Endpoint</th>
           <th>Body</th>
           <th>Status Code</th>
+          <th>Response Time</th>
           <th>Response</th>
         </tr>
       </thead>
@@ -41,6 +42,7 @@ const ResultTable = ({ results }) => {
                 : ''}
             </td>
             <td>{result.statusCode}</td>
+            <td>{result.reponse_time}</td>
             <td>
               {result.responseBody ? (
                 <details>

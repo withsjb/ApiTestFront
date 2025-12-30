@@ -33,6 +33,17 @@ const AUTH_CONFIGS = {
       { id: 'clientSecret', label: 'Client Secret', type: 'password' },
       { id: 'scope', label: 'Scope', type: 'text', placeholder: 'e.g. read write' }
     ]
+  },
+  // ✅ AWS Signature 설정 추가
+  'AWS Signature': {
+    isCard: true,
+    fields: [
+      { id: 'awsAccessKey', label: 'Access Key', type: 'text', placeholder: 'Access Key' },
+      { id: 'awsSecretKey', label: 'Secret Key', type: 'password', placeholder: 'Secret Key' },
+      { id: 'awsRegion', label: 'AWS Region', type: 'text', placeholder: 'e.g. ap-northeast-2' },
+      { id: 'awsService', label: 'Service Name', type: 'text', placeholder: 'e.g. s3, ec2, lambda' },
+      { id: 'awsSessionToken', label: 'Session Token', type: 'text', placeholder: 'Optional Session Token', fullWidth: true }
+    ]
   }
 };
 
@@ -140,7 +151,12 @@ const Authorization = ({ onAuthChange, initialAuth }) => {
         <input
           type={field.type === 'password' && !showPassword ? 'password' : 'text'}
           placeholder={field.placeholder || field.label}
-          style={{ width: field.width || '100%', paddingRight: field.type === 'password' ? '35px' : '10px' }}
+          style={{ 
+            width: field.width || '100%', 
+            padding: '5px',
+            paddingRight: field.type === 'password' ? '35px' : '10px',
+            boxSizing: 'border-box'
+          }}
           value={authData[field.id] || ''}
           onChange={(e) => handleInputChange(field.id, e.target.value)}
         />

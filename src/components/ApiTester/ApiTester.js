@@ -51,6 +51,15 @@ const ApiTester = ({ selectedHistory, onSendRequest, onSaveToHistory, onSelectHi
           case 'API_Key':
               authDetails.authData = { key: history.apiKey, value: history.apiValue };
               break;
+          case 'AWS_Signature':
+            authDetails.authData = {
+                awsAccessKey: history.awsAccessKey,
+                awsSecretKey: history.awsSecretKey,
+                awsRegion: history.awsRegion,
+                awsService: history.awsService,
+                awsSessionToken: history.awsSessionToken
+            };
+            break;
           default: 
               break;
       }
@@ -98,15 +107,21 @@ const ApiTester = ({ selectedHistory, onSendRequest, onSaveToHistory, onSelectHi
       clientId: authData.clientId || '',
       clientSecret: authData.clientSecret || '',
       clientAuthMethod: authData.clientAuthMethod || 'header',
-      
       username: authData.username || '',
       password: authData.password || '',
       key: authData.key || '',
       value: authData.value || '',
+      awsAccessKey: authData.awsAccessKey || '',
+      awsSecretKey: authData.awsSecretKey || '',
+      awsRegion: authData.awsRegion || '',
+      awsService: authData.awsService || '',
+      awsSessionToken: authData.awsSessionToken || '',
       
       params: formData.params.filter(p => p.key || p.value),
       headers: formData.headers.filter(h => h.key || h.value),
-      collectionId: selectedHistory?.collectionId || null
+      parentId: selectedHistory?.apiId || null,
+      collectionId: selectedHistory?.collectionId || null,
+      apiId: selectedHistory?.apiId || null
     };
   };
 
@@ -140,7 +155,17 @@ const ApiTester = ({ selectedHistory, onSendRequest, onSaveToHistory, onSelectHi
   };
 
   const handleSaveAsNew = () => {
-    onSaveToHistory(getFormattedData()); 
+    const data = getFormattedData();
+    
+    const newData = {
+      ...data,
+      apiId: null,         
+      collectionId: null   // UNCLASSIFIED로 이동
+    };
+
+    if (onSaveToHistory) {
+      onSaveToHistory(newData);
+    }
   };
 
   const handleSubmit = async (e) => {

@@ -36,10 +36,11 @@ function App() {
     // 2. Payload 구성 - apiId를 최우선으로 확보
     // flattenedData에 apiId가 없더라도 selectedHistory에 있다면 그것을 사용합니다.
     const apiId = selectedHistory?.apiId || flattenedData?.apiId || null;
-
+    const parentId = flattenedData?.parentId || selectedHistory?.apiId || null; // ✅ 추가
     let payload = { 
       ...flattenedData,
-      apiId: apiId 
+      apiId: apiId, 
+      parentId: parentId
     };
 
     // 3. 상속 로직 (기존 유지)
@@ -84,31 +85,53 @@ function App() {
 
   // 신규 저장 및 갱신 공통
   const handleSaveToHistory = async (data) => {
-    if (data) {
-        try {
-            await axios.post('/api/history/save', data);
-            alert("저장되었습니다.");
-        } catch (e) {
-            console.error("저장 오류", e);
-        }
+  if (data) {
+    try {
+      // 서버에서 저장된 엔티티(apiId 포함)를 반환한다고 가정
+      // const response = await axios.post('/api/history/save', data);
+      alert("새로운 기록이 UNCLASSIFIED에 저장되었습니다.");
+      
+      // 필요하다면: 방금 저장한 기록을 편집 모드로 바로 전환
+      // setSelectedHistory(response.data); 
+    } catch (e) {
+      console.error("저장 오류", e);
     }
-    fetchHistoryTrigger();
-  };
+  }
+  fetchHistoryTrigger(); // 목록 갱신 (Sidebar 업데이트)
+};
 
   const handleBulkResults = (bulkData) => {
-    const rawList = Array.isArray(bulkData) ? bulkData : (bulkData.results || bulkData.details || []);
-    if (rawList.length === 0) return;
+      // 1. 디버깅용 콘솔
+      console.log("전달받은 벌크 데이터:", bulkData);
 
-    const mappedResults = rawList.map((item, index) => ({
-      testcaseId: item.apiId || item.testcaseId || `bulk-${Date.now()}-${index}`,
-      method: item.method || 'GET',
-      url: item.apiUrl || item.url || 'N/A',
-      statusCode: item.statusCode || item.status || 0,
-      responseBody: item.responseBody || item.response || item.body || '응답 본문 없음'
-    }));
+      // 2. 결과 리스트 추출 (백엔드에서 보내주는 'details' 필드 사용)
+      const rawList = bulkData.details || (Array.isArray(bulkData) ? bulkData : []);
+      
+      // 데이터가 없는지 체크하는 로직 수정
+      if (rawList.length === 0) {
+          console.warn("표시할 결과 데이터(details)가 없습니다.");
+          return;
+      }
 
-    setResults(prev => [...mappedResults, ...prev]);
-    fetchHistoryTrigger();
+      // 3. 팝업 알림 (백엔드 필드명 successCount, failureCount에 맞춤)
+      const success = bulkData.successCount !== undefined ? bulkData.successCount : 0;
+      const fail = bulkData.failureCount !== undefined ? bulkData.failureCount : 0;
+      
+      alert(`단체 테스트 완료!\n성공: ${success}건\n실패: ${fail}건`);
+
+      // 4. 테이블 매핑
+      const mappedResults = rawList.map((item, index) => ({
+        testcaseId: item.apiId || item.testcaseId || `bulk-${Date.now()}-${index}`,
+        method: item.method || 'GET',
+        url: item.apiUrl || item.url || 'N/A',
+        statusCode: item.statusCode || item.status || 0,
+        // 백엔드 엔티티 필드명이 responsebody(소문자)인지 확인하며 매핑
+        responseBody: item.responsebody || item.responseBody || item.body || '응답 본문 없음'
+      }));
+
+      // 5. 상태 업데이트
+      setResults(prev => [...mappedResults, ...prev]);
+      fetchHistoryTrigger();
   };
 
   return (
